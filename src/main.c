@@ -647,13 +647,13 @@ void rom_file_selector()
         case KEY_A:
         case KEY_B:
             DBG_INFO("ROM File Selector: A/B button pressed - loading ROM: %s\n", filename[selected]);
-            /*
+            
             rom_file_selector_display_page(filename, num_page);
-            sprintf(buf, "%s", filename[selected]);
+            sprintf(buf, "Loading %s", filename[selected]);
             draw_string(0, FRAME_BUFF_HEIGHT - 20, buf);
             update_lcd();
             sleep_ms(150);
-            */
+            
             load_cart_rom_file(filename[selected]);
             break_outer = true;
             break;
