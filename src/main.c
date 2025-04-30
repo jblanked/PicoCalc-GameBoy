@@ -792,6 +792,7 @@ int main(void)
 #endif
 
 #if ENABLE_LCD
+    set_spi_speed(SYS_CLK_FREQ / 4);
     clear_frame_buff();
     update_lcd();
 #endif
