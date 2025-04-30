@@ -1,0 +1,9 @@
+{
+    "files.associations": {
+        "compare": "c",
+        "cstdint": "c",
+        "ili9488_lcd.h": "c",
+        "pio.h": "c",
+        "peanut_gb.h": "c"
+    }
+}

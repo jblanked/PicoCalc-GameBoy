@@ -13,7 +13,6 @@ target_sources(FatFs_SPI INTERFACE
     ${CMAKE_CURRENT_LIST_DIR}/src/f_util.c
     ${CMAKE_CURRENT_LIST_DIR}/src/ff_stdio.c
     ${CMAKE_CURRENT_LIST_DIR}/src/my_debug.c
-    ${CMAKE_CURRENT_LIST_DIR}/src/rtc.c
 )
 target_include_directories(FatFs_SPI INTERFACE
     ff15/source
@@ -23,6 +22,5 @@ target_include_directories(FatFs_SPI INTERFACE
 target_link_libraries(FatFs_SPI INTERFACE
         hardware_spi
         hardware_dma
-        hardware_rtc
         pico_stdlib
 )

@@ -1,0 +1,7 @@
+.program picocalc
+.side_set 1
+
+.wrap_target
+    out pins, 1     side 0
+    in pins, 1      side 1
+.wrap
