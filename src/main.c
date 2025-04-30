@@ -296,12 +296,13 @@ void lcd_draw_line_bis(struct gb_s *gb, const uint8_t pixels[LCD_WIDTH],
     finish_write_data(false);
     if(line==0){
         // Double the width when starting the window
-        start_window((WIDTH - (LCD_WIDTH * 2)) / 2, ((HEIGHT - LCD_HEIGHT) / 2), LCD_WIDTH * 2, LCD_HEIGHT*2);
+        start_window((WIDTH - (LCD_WIDTH * 2)) / 2, ((HEIGHT - (LCD_HEIGHT*2)) / 2), LCD_WIDTH * 2, LCD_HEIGHT*2);
     } else if (line == LCD_HEIGHT) {
         finish_write_data(true);
     } else {
         // Write double-width line twice to create vertical duplication
         write_data(pixels_buffer, LCD_WIDTH * 2);
+        finish_write_data(false);
         write_data(pixels_buffer, LCD_WIDTH * 2);
     }
 }
@@ -818,7 +819,7 @@ int main(void)
         auto_assign_palette(palette, gb_colour_hash(&gb), gb_get_rom_name(&gb, rom_title));
 
 #if ENABLE_LCD
-        gb_init_lcd(&gb, &lcd_draw_line);
+        gb_init_lcd(&gb, &lcd_draw_line_bis);
         DBG_INFO("LCD ");
 #endif
 
