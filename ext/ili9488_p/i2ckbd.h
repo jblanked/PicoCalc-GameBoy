@@ -6,7 +6,7 @@
 #define I2C_KBD_MOD i2c1
 #define I2C_KBD_SDA 6
 #define I2C_KBD_SCL 7
-#define I2C_KBD_SPEED 400000
+#define I2C_KBD_SPEED 10000 //400000
 #define I2C_KBD_ADDR 0x1F
 
 void init_i2c_kbd();
