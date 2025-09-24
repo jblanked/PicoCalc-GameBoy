@@ -60,14 +60,16 @@
 #include <hardware/irq.h>
 
 /* Project headers */
-//#include "pwm_audio.h"
+// #include "pwm_audio.h"
 #include "debug.h"
 #include "hedley.h"
 #include "minigb_apu.h"
 #include "sdcard.h"
 
-//#include "i2s.h"
+// #include "i2s.h"
 #include "gbcolors.h"
+
+#include "../ext/ili9488_p/mono8x16.h"
 
 /*
 #include "ili9488_lcd.h"
@@ -92,8 +94,8 @@ typedef enum
     AUDIO_CMD_INVALID
 } audio_commands_e;
 
-#define audio_read(a)      audio_read(&apu_ctx, (a))
-#define audio_write(a, v)  audio_write(&apu_ctx, (a), (v));
+#define audio_read(a) audio_read(&apu_ctx, (a))
+#define audio_write(a, v) audio_write(&apu_ctx, (a), (v));
 
 /**
  * Global variables for audio task
@@ -126,7 +128,7 @@ struct minigb_apu_ctx apu_ctx = {0};
  * Once done, we can access this at XIP_BASE + 1Mb.
  * Game Boy DMG ROM size ranges from 32768 bytes (e.g. Tetris) to 1,048,576 bytes (e.g. Pokemod Red)
  */
-//#define FLASH_TARGET_OFFSET ((1024 * 1024) + (256 * 1024))
+// #define FLASH_TARGET_OFFSET ((1024 * 1024) + (256 * 1024))
 #define FLASH_TARGET_OFFSET (1024 * 1024)
 const uint8_t *rom = (const uint8_t *)(XIP_BASE + FLASH_TARGET_OFFSET);
 static unsigned char rom_bank0[65536];
@@ -201,7 +203,7 @@ void gb_error(struct gb_s *gb, const enum gb_error_e gb_err, const uint16_t addr
 void draw_string(int x, int y, const char *str)
 {
     draw_string_rgb565(
-        pixels_buffer, FRAME_BUFF_STRIDE, FRAME_BUFF_WIDTH, FRAME_BUFF_HEIGHT,
+        (uint8_t *)pixels_buffer, FRAME_BUFF_STRIDE, FRAME_BUFF_WIDTH, FRAME_BUFF_HEIGHT,
         x, y, str, 0xffff);
 }
 
@@ -215,7 +217,7 @@ void clear_frame_buff()
 
 void clear_screen_buff()
 {
-    for (int i = 0; i < (WIDTH) * HEIGHT; i++)
+    for (int i = 0; i < (WIDTH)*HEIGHT; i++)
     {
         pixels_buffer[i] = 0;
     }
@@ -224,13 +226,13 @@ void clear_screen_buff()
 void update_lcd()
 {
     start_write_data((WIDTH - FRAME_BUFF_WIDTH) / 2, (HEIGHT - FRAME_BUFF_HEIGHT) / 2,
-                     FRAME_BUFF_WIDTH, FRAME_BUFF_HEIGHT, pixels_buffer);
+                     FRAME_BUFF_WIDTH, FRAME_BUFF_HEIGHT, (uint8_t *)pixels_buffer);
     finish_write_data(true);
 }
 
 void update_full_screen()
 {
-    start_write_data(0, 0, WIDTH, HEIGHT, pixels_buffer);
+    start_write_data(0, 0, WIDTH, HEIGHT, (uint8_t *)pixels_buffer);
     finish_write_data(true);
 }
 
@@ -255,14 +257,19 @@ void lcd_draw_line(struct gb_s *gb, const uint8_t pixels[LCD_WIDTH],
 #if PEANUT_FULL_GBC_SUPPORT
     }
 #endif
-    
+
     finish_write_data(false);
-    if(line==0){
+    if (line == 0)
+    {
         start_window((WIDTH - LCD_WIDTH) / 2, ((HEIGHT - LCD_HEIGHT) / 2), LCD_WIDTH, LCD_HEIGHT);
-    } else if (line == LCD_HEIGHT) {
+    }
+    else if (line == LCD_HEIGHT)
+    {
         finish_write_data(true);
-    } else {
-        write_data(pixels_buffer, LCD_WIDTH);
+    }
+    else
+    {
+        write_data((uint8_t *)pixels_buffer, LCD_WIDTH);
     }
 }
 
@@ -292,18 +299,23 @@ void lcd_draw_line_bis(struct gb_s *gb, const uint8_t pixels[LCD_WIDTH],
 #if PEANUT_FULL_GBC_SUPPORT
     }
 #endif
-    
+
     finish_write_data(false);
-    if(line==0){
+    if (line == 0)
+    {
         // Double the width when starting the window
-        start_window((WIDTH - (LCD_WIDTH * 2)) / 2, ((HEIGHT - (LCD_HEIGHT*2)) / 2), LCD_WIDTH * 2, LCD_HEIGHT*2);
-    } else if (line == LCD_HEIGHT) {
+        start_window((WIDTH - (LCD_WIDTH * 2)) / 2, ((HEIGHT - (LCD_HEIGHT * 2)) / 2), LCD_WIDTH * 2, LCD_HEIGHT * 2);
+    }
+    else if (line == LCD_HEIGHT)
+    {
         finish_write_data(true);
-    } else {
+    }
+    else
+    {
         // Write double-width line twice to create vertical duplication
-        write_data(pixels_buffer, LCD_WIDTH * 2);
+        write_data((uint8_t *)pixels_buffer, LCD_WIDTH * 2);
         finish_write_data(false);
-        write_data(pixels_buffer, LCD_WIDTH * 2);
+        write_data((uint8_t *)pixels_buffer, LCD_WIDTH * 2);
     }
 }
 #endif
@@ -647,13 +659,13 @@ void rom_file_selector()
         case KEY_A:
         case KEY_B:
             DBG_INFO("ROM File Selector: A/B button pressed - loading ROM: %s\n", filename[selected]);
-            
+
             rom_file_selector_display_page(filename, num_page);
             sprintf(buf, "Loading %s", filename[selected]);
             draw_string(0, FRAME_BUFF_HEIGHT - 20, buf);
             update_lcd();
             sleep_ms(150);
-            
+
             load_cart_rom_file(filename[selected]);
             break_outer = true;
             break;
@@ -761,7 +773,7 @@ int main(void)
 {
     static struct gb_s gb;
     enum gb_init_error_e ret;
-    
+
     /* Overclock to 300 MHZ. */
     vreg_set_voltage(VREG_VOLTAGE_1_30);
     sleep_ms(100);
@@ -770,7 +782,7 @@ int main(void)
     DBG_INIT();
     DBG_INFO("INIT: ");
 
-#if ENABLE_SOUND    
+#if ENABLE_SOUND
     multicore_launch_core1(core1_audio);
 #endif
 
@@ -782,8 +794,8 @@ int main(void)
 #endif
 
     init_i2c_kbd(); // Init keyboard
-    device_init(); // Init device
-    
+    device_init();  // Init device
+
     while (true)
     {
 
@@ -793,9 +805,9 @@ int main(void)
 #endif
 
 #if ENABLE_LCD
-    set_spi_speed(SYS_CLK_FREQ / 4);
-    clear_frame_buff();
-    update_lcd();
+        set_spi_speed(SYS_CLK_FREQ / 4);
+        clear_frame_buff();
+        update_lcd();
 #endif
         /* Initialise GB context. */
         memcpy(rom_bank0, rom, sizeof(rom_bank0));
@@ -854,14 +866,14 @@ int main(void)
             prev_joypad_bits.b = gb.direct.joypad_bits.b;
             prev_joypad_bits.select = gb.direct.joypad_bits.select;
             prev_joypad_bits.start = gb.direct.joypad_bits.start;
-            gb.direct.joypad_bits.up = input_pins[KEY_UP]==0?1:0;
-            gb.direct.joypad_bits.down = input_pins[KEY_DOWN]==0?1:0;
-            gb.direct.joypad_bits.left = input_pins[KEY_LEFT]==0?1:0;
-            gb.direct.joypad_bits.right = input_pins[KEY_RIGHT]==0?1:0;
-            gb.direct.joypad_bits.a = input_pins[KEY_A]==0?1:0;
-            gb.direct.joypad_bits.b = input_pins[KEY_B]==0?1:0;
-            gb.direct.joypad_bits.select = input_pins[KEY_SELECT]==0?1:0;
-            gb.direct.joypad_bits.start = input_pins[KEY_START]==0?1:0;
+            gb.direct.joypad_bits.up = input_pins[KEY_UP] == 0 ? 1 : 0;
+            gb.direct.joypad_bits.down = input_pins[KEY_DOWN] == 0 ? 1 : 0;
+            gb.direct.joypad_bits.left = input_pins[KEY_LEFT] == 0 ? 1 : 0;
+            gb.direct.joypad_bits.right = input_pins[KEY_RIGHT] == 0 ? 1 : 0;
+            gb.direct.joypad_bits.a = input_pins[KEY_A] == 0 ? 1 : 0;
+            gb.direct.joypad_bits.b = input_pins[KEY_B] == 0 ? 1 : 0;
+            gb.direct.joypad_bits.select = input_pins[KEY_SELECT] == 0 ? 1 : 0;
+            gb.direct.joypad_bits.start = input_pins[KEY_START] == 0 ? 1 : 0;
 
             /* hotkeys (select + * combo)*/
             if (!gb.direct.joypad_bits.select)

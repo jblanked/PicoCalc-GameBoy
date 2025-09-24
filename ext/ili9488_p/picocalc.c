@@ -4,6 +4,7 @@
 #include "picocalc.pio.h"
 #include "mono8x16.h"
 #include "i2ckbd.h"
+#include <stdio.h>
 
 static int sys_clock_hz;
 static direction_t curr_dir = EMPTY;
@@ -45,7 +46,7 @@ void init(int sys_clk_hz)
     pio_sm_set_consecutive_pindirs(spi_pio, spi_sm, PIN_SCK, 1, true);
 
     dma_tx = dma_claim_unused_channel(true);
-    
+
     gpio_init(PIN_RST);
     gpio_init(PIN_DC);
     gpio_init(PIN_LCD_CS);
@@ -156,7 +157,7 @@ void init(int sys_clk_hz)
     // TFT_INVON
     write_command(0x21, NULL, 0);
 
-    //clear(0);
+    // clear(0);
 
     write_command(0x29, NULL, 0); // TFT_DISPON
     sleep_ms(120);
@@ -179,7 +180,7 @@ void setup_pio(direction_t new_dir, int new_speed)
         return;
 
     float div = sys_clock_hz / 2.f / new_speed;
-    //printf("SPI: %d MHz, %d\n", new_speed / 1000000, (int)div);
+    // printf("SPI: %d MHz, %d\n", new_speed / 1000000, (int)div);
     pio_sm_set_enabled(spi_pio, spi_sm, false);
 
     // load new PIO
@@ -233,8 +234,8 @@ void clear(uint16_t color)
     for (int y = 0; y < HEIGHT; y++)
     {
         write_data(data, WIDTH);
-        //start_write_data(0, y, WIDTH, 1, data);
-        //finish_write_data(true);
+        // start_write_data(0, y, WIDTH, 1, data);
+        // finish_write_data(true);
     }
     finish_write_data(true);
 }
@@ -283,7 +284,7 @@ void start_write_data(int x0, int y0, int w, int h, uint8_t *data)
 
             dma_start_channel_mask(1u << dma_tx);
         }*/
-            
+
         dma_channel_transfer_from_buffer_now(dma_tx, data, (w * h * 2));
     }
 }
@@ -320,7 +321,7 @@ void start_window(int x0, int y0, int w, int h)
 
 void write_data(uint8_t *data, uint16_t length)
 {
-    dma_channel_transfer_from_buffer_now(dma_tx, data, length*2);
+    dma_channel_transfer_from_buffer_now(dma_tx, data, length * 2);
     /* Start the DMA transfer
     dma_channel_config dma_cfg = dma_channel_get_default_config(dma_tx);
     channel_config_set_transfer_data_size(&dma_cfg, DMA_SIZE_8);
@@ -334,7 +335,8 @@ void write_data(uint8_t *data, uint16_t length)
                           true);                 // Start immediately */
 }
 
-void start_game(){
+void start_game()
+{
     // Setup DMA
     dma_channel_config dma_cfg = dma_channel_get_default_config(dma_tx);
     channel_config_set_transfer_data_size(&dma_cfg, DMA_SIZE_8);
@@ -344,7 +346,7 @@ void start_game(){
     dma_channel_configure(dma_tx, &dma_cfg,
                           &spi_pio->txf[spi_sm], // write address
                           NULL,                  // read address
-                          0,            // element count (each element is of size transfer_data_size)
+                          0,                     // element count (each element is of size transfer_data_size)
                           false);                // Start immediately
 }
 
