@@ -60,14 +60,16 @@
 #include <hardware/irq.h>
 
 /* Project headers */
-//#include "pwm_audio.h"
+// #include "pwm_audio.h"
 #include "debug.h"
 #include "hedley.h"
 #include "minigb_apu.h"
 #include "sdcard.h"
 
-//#include "i2s.h"
+// #include "i2s.h"
 #include "gbcolors.h"
+
+#include "../ext/ili9488_p/mono8x16.h"
 
 /*
 #include "ili9488_lcd.h"
@@ -92,8 +94,8 @@ typedef enum
     AUDIO_CMD_INVALID
 } audio_commands_e;
 
-#define audio_read(a)      audio_read(&apu_ctx, (a))
-#define audio_write(a, v)  audio_write(&apu_ctx, (a), (v));
+#define audio_read(a) audio_read(&apu_ctx, (a))
+#define audio_write(a, v) audio_write(&apu_ctx, (a), (v));
 
 /**
  * Global variables for audio task
@@ -126,7 +128,7 @@ struct minigb_apu_ctx apu_ctx = {0};
  * Once done, we can access this at XIP_BASE + 1Mb.
  * Game Boy DMG ROM size ranges from 32768 bytes (e.g. Tetris) to 1,048,576 bytes (e.g. Pokemod Red)
  */
-//#define FLASH_TARGET_OFFSET ((1024 * 1024) + (256 * 1024))
+// #define FLASH_TARGET_OFFSET ((1024 * 1024) + (256 * 1024))
 #define FLASH_TARGET_OFFSET (1024 * 1024)
 const uint8_t *rom = (const uint8_t *)(XIP_BASE + FLASH_TARGET_OFFSET);
 static unsigned char rom_bank0[65536];
@@ -149,7 +151,7 @@ static struct
 } prev_joypad_bits;
 
 /* Pixel data is stored in here. */
-static uint16_t pixels_buffer[FRAME_BUFF_STRIDE * 240];
+static uint8_t pixels_buffer[FRAME_BUFF_STRIDE * 240 * 2];
 
 /**
  * Returns a byte from the ROM file at the given address.
@@ -207,7 +209,7 @@ void draw_string(int x, int y, const char *str)
 
 void clear_frame_buff()
 {
-    for (int i = 0; i < FRAME_BUFF_STRIDE * FRAME_BUFF_HEIGHT; i++)
+    for (int i = 0; i < FRAME_BUFF_STRIDE * FRAME_BUFF_HEIGHT * 2; i++)
     {
         pixels_buffer[i] = 0;
     }
@@ -215,7 +217,7 @@ void clear_frame_buff()
 
 void clear_screen_buff()
 {
-    for (int i = 0; i < (WIDTH) * HEIGHT; i++)
+    for (int i = 0; i < (WIDTH)*HEIGHT * 2; i++)
     {
         pixels_buffer[i] = 0;
     }
@@ -242,7 +244,15 @@ void lcd_draw_line(struct gb_s *gb, const uint8_t pixels[LCD_WIDTH],
     {
         for (unsigned int x = 0; x < LCD_WIDTH; x++)
         {
-            pixels_buffer[x] = gb->cgb.fixPalette[pixels[x]] << 1;
+            // Convert RGB555 to RGB565 properly
+            uint16_t color555 = gb->cgb.fixPalette[pixels[x]];
+            uint16_t r = (color555 >> 10) & 0x1F;
+            uint16_t g = (color555 >> 5) & 0x1F;
+            uint16_t b = color555 & 0x1F;
+            uint16_t color565 = (r << 11) | ((g << 1) << 5) | b;
+            // Store in big-endian byte order (high byte first)
+            pixels_buffer[x * 2] = (uint8_t)(color565 >> 8);       // high byte
+            pixels_buffer[x * 2 + 1] = (uint8_t)(color565 & 0xFF); // low byte
         }
     }
     else
@@ -250,18 +260,26 @@ void lcd_draw_line(struct gb_s *gb, const uint8_t pixels[LCD_WIDTH],
 #endif
         for (unsigned int x = 0; x < LCD_WIDTH; x++)
         {
-            pixels_buffer[x] = palette[(pixels[x] & LCD_PALETTE_ALL) >> 4][pixels[x] & 3];
+            uint16_t color = palette[(pixels[x] & LCD_PALETTE_ALL) >> 4][pixels[x] & 3];
+            // Store in big-endian byte order (high byte first)
+            pixels_buffer[x * 2] = (uint8_t)(color >> 8);       // high byte
+            pixels_buffer[x * 2 + 1] = (uint8_t)(color & 0xFF); // low byte
         }
 #if PEANUT_FULL_GBC_SUPPORT
     }
 #endif
-    
+
     finish_write_data(false);
-    if(line==0){
+    if (line == 0)
+    {
         start_window((WIDTH - LCD_WIDTH) / 2, ((HEIGHT - LCD_HEIGHT) / 2), LCD_WIDTH, LCD_HEIGHT);
-    } else if (line == LCD_HEIGHT) {
+    }
+    else if (line == LCD_HEIGHT)
+    {
         finish_write_data(true);
-    } else {
+    }
+    else
+    {
         write_data(pixels_buffer, LCD_WIDTH);
     }
 }
@@ -275,9 +293,17 @@ void lcd_draw_line_bis(struct gb_s *gb, const uint8_t pixels[LCD_WIDTH],
     {
         for (unsigned int x = 0; x < LCD_WIDTH; x++)
         {
-            // Duplicate each pixel twice in the buffer
-            pixels_buffer[x * 2] = gb->cgb.fixPalette[pixels[x]] << 1;
-            pixels_buffer[x * 2 + 1] = gb->cgb.fixPalette[pixels[x]] << 1;
+            // Convert RGB555 to RGB565 properly
+            uint16_t color555 = gb->cgb.fixPalette[pixels[x]];
+            uint16_t r = (color555 >> 10) & 0x1F;
+            uint16_t g = (color555 >> 5) & 0x1F;
+            uint16_t b = color555 & 0x1F;
+            uint16_t pixel = (r << 11) | ((g << 1) << 5) | b;
+            // Duplicate each pixel twice in the buffer with correct byte order
+            pixels_buffer[x * 4] = (uint8_t)(pixel >> 8);       // high byte of first pixel
+            pixels_buffer[x * 4 + 1] = (uint8_t)(pixel & 0xFF); // low byte of first pixel
+            pixels_buffer[x * 4 + 2] = (uint8_t)(pixel >> 8);   // high byte of second pixel
+            pixels_buffer[x * 4 + 3] = (uint8_t)(pixel & 0xFF); // low byte of second pixel
         }
     }
     else
@@ -285,21 +311,29 @@ void lcd_draw_line_bis(struct gb_s *gb, const uint8_t pixels[LCD_WIDTH],
 #endif
         for (unsigned int x = 0; x < LCD_WIDTH; x++)
         {
-            // Duplicate each pixel twice in the buffer
-            pixels_buffer[x * 2] = palette[(pixels[x] & LCD_PALETTE_ALL) >> 4][pixels[x] & 3];
-            pixels_buffer[x * 2 + 1] = palette[(pixels[x] & LCD_PALETTE_ALL) >> 4][pixels[x] & 3];
+            // Duplicate each pixel twice in the buffer with correct byte order
+            uint16_t pixel = palette[(pixels[x] & LCD_PALETTE_ALL) >> 4][pixels[x] & 3];
+            pixels_buffer[x * 4] = (uint8_t)(pixel >> 8);       // high byte of first pixel
+            pixels_buffer[x * 4 + 1] = (uint8_t)(pixel & 0xFF); // low byte of first pixel
+            pixels_buffer[x * 4 + 2] = (uint8_t)(pixel >> 8);   // high byte of second pixel
+            pixels_buffer[x * 4 + 3] = (uint8_t)(pixel & 0xFF); // low byte of second pixel
         }
 #if PEANUT_FULL_GBC_SUPPORT
     }
 #endif
-    
+
     finish_write_data(false);
-    if(line==0){
+    if (line == 0)
+    {
         // Double the width when starting the window
-        start_window((WIDTH - (LCD_WIDTH * 2)) / 2, ((HEIGHT - (LCD_HEIGHT*2)) / 2), LCD_WIDTH * 2, LCD_HEIGHT*2);
-    } else if (line == LCD_HEIGHT) {
+        start_window((WIDTH - (LCD_WIDTH * 2)) / 2, ((HEIGHT - (LCD_HEIGHT * 2)) / 2), LCD_WIDTH * 2, LCD_HEIGHT * 2);
+    }
+    else if (line == LCD_HEIGHT)
+    {
         finish_write_data(true);
-    } else {
+    }
+    else
+    {
         // Write double-width line twice to create vertical duplication
         write_data(pixels_buffer, LCD_WIDTH * 2);
         finish_write_data(false);
@@ -647,13 +681,13 @@ void rom_file_selector()
         case KEY_A:
         case KEY_B:
             DBG_INFO("ROM File Selector: A/B button pressed - loading ROM: %s\n", filename[selected]);
-            
+
             rom_file_selector_display_page(filename, num_page);
             sprintf(buf, "Loading %s", filename[selected]);
             draw_string(0, FRAME_BUFF_HEIGHT - 20, buf);
             update_lcd();
             sleep_ms(150);
-            
+
             load_cart_rom_file(filename[selected]);
             break_outer = true;
             break;
@@ -761,7 +795,7 @@ int main(void)
 {
     static struct gb_s gb;
     enum gb_init_error_e ret;
-    
+
     /* Overclock to 300 MHZ. */
     vreg_set_voltage(VREG_VOLTAGE_1_30);
     sleep_ms(100);
@@ -770,7 +804,7 @@ int main(void)
     DBG_INIT();
     DBG_INFO("INIT: ");
 
-#if ENABLE_SOUND    
+#if ENABLE_SOUND
     multicore_launch_core1(core1_audio);
 #endif
 
@@ -782,8 +816,8 @@ int main(void)
 #endif
 
     init_i2c_kbd(); // Init keyboard
-    device_init(); // Init device
-    
+    device_init();  // Init device
+
     while (true)
     {
 
@@ -793,9 +827,9 @@ int main(void)
 #endif
 
 #if ENABLE_LCD
-    set_spi_speed(SYS_CLK_FREQ / 4);
-    clear_frame_buff();
-    update_lcd();
+        set_spi_speed(SYS_CLK_FREQ / 4);
+        clear_frame_buff();
+        update_lcd();
 #endif
         /* Initialise GB context. */
         memcpy(rom_bank0, rom, sizeof(rom_bank0));
@@ -854,14 +888,14 @@ int main(void)
             prev_joypad_bits.b = gb.direct.joypad_bits.b;
             prev_joypad_bits.select = gb.direct.joypad_bits.select;
             prev_joypad_bits.start = gb.direct.joypad_bits.start;
-            gb.direct.joypad_bits.up = input_pins[KEY_UP]==0?1:0;
-            gb.direct.joypad_bits.down = input_pins[KEY_DOWN]==0?1:0;
-            gb.direct.joypad_bits.left = input_pins[KEY_LEFT]==0?1:0;
-            gb.direct.joypad_bits.right = input_pins[KEY_RIGHT]==0?1:0;
-            gb.direct.joypad_bits.a = input_pins[KEY_A]==0?1:0;
-            gb.direct.joypad_bits.b = input_pins[KEY_B]==0?1:0;
-            gb.direct.joypad_bits.select = input_pins[KEY_SELECT]==0?1:0;
-            gb.direct.joypad_bits.start = input_pins[KEY_START]==0?1:0;
+            gb.direct.joypad_bits.up = input_pins[KEY_UP] == 0 ? 1 : 0;
+            gb.direct.joypad_bits.down = input_pins[KEY_DOWN] == 0 ? 1 : 0;
+            gb.direct.joypad_bits.left = input_pins[KEY_LEFT] == 0 ? 1 : 0;
+            gb.direct.joypad_bits.right = input_pins[KEY_RIGHT] == 0 ? 1 : 0;
+            gb.direct.joypad_bits.a = input_pins[KEY_A] == 0 ? 1 : 0;
+            gb.direct.joypad_bits.b = input_pins[KEY_B] == 0 ? 1 : 0;
+            gb.direct.joypad_bits.select = input_pins[KEY_SELECT] == 0 ? 1 : 0;
+            gb.direct.joypad_bits.start = input_pins[KEY_START] == 0 ? 1 : 0;
 
             /* hotkeys (select + * combo)*/
             if (!gb.direct.joypad_bits.select)
