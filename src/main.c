@@ -151,7 +151,7 @@ static struct
 } prev_joypad_bits;
 
 /* Pixel data is stored in here. */
-static uint16_t pixels_buffer[FRAME_BUFF_STRIDE * 240];
+static uint8_t pixels_buffer[FRAME_BUFF_STRIDE * 240 * 2];
 
 /**
  * Returns a byte from the ROM file at the given address.
@@ -203,13 +203,13 @@ void gb_error(struct gb_s *gb, const enum gb_error_e gb_err, const uint16_t addr
 void draw_string(int x, int y, const char *str)
 {
     draw_string_rgb565(
-        (uint8_t *)pixels_buffer, FRAME_BUFF_STRIDE, FRAME_BUFF_WIDTH, FRAME_BUFF_HEIGHT,
+        pixels_buffer, FRAME_BUFF_STRIDE, FRAME_BUFF_WIDTH, FRAME_BUFF_HEIGHT,
         x, y, str, 0xffff);
 }
 
 void clear_frame_buff()
 {
-    for (int i = 0; i < FRAME_BUFF_STRIDE * FRAME_BUFF_HEIGHT; i++)
+    for (int i = 0; i < FRAME_BUFF_STRIDE * FRAME_BUFF_HEIGHT * 2; i++)
     {
         pixels_buffer[i] = 0;
     }
@@ -217,7 +217,7 @@ void clear_frame_buff()
 
 void clear_screen_buff()
 {
-    for (int i = 0; i < (WIDTH)*HEIGHT; i++)
+    for (int i = 0; i < (WIDTH)*HEIGHT * 2; i++)
     {
         pixels_buffer[i] = 0;
     }
@@ -226,13 +226,13 @@ void clear_screen_buff()
 void update_lcd()
 {
     start_write_data((WIDTH - FRAME_BUFF_WIDTH) / 2, (HEIGHT - FRAME_BUFF_HEIGHT) / 2,
-                     FRAME_BUFF_WIDTH, FRAME_BUFF_HEIGHT, (uint8_t *)pixels_buffer);
+                     FRAME_BUFF_WIDTH, FRAME_BUFF_HEIGHT, pixels_buffer);
     finish_write_data(true);
 }
 
 void update_full_screen()
 {
-    start_write_data(0, 0, WIDTH, HEIGHT, (uint8_t *)pixels_buffer);
+    start_write_data(0, 0, WIDTH, HEIGHT, pixels_buffer);
     finish_write_data(true);
 }
 
@@ -244,7 +244,15 @@ void lcd_draw_line(struct gb_s *gb, const uint8_t pixels[LCD_WIDTH],
     {
         for (unsigned int x = 0; x < LCD_WIDTH; x++)
         {
-            pixels_buffer[x] = gb->cgb.fixPalette[pixels[x]] << 1;
+            // Convert RGB555 to RGB565 properly
+            uint16_t color555 = gb->cgb.fixPalette[pixels[x]];
+            uint16_t r = (color555 >> 10) & 0x1F;
+            uint16_t g = (color555 >> 5) & 0x1F;
+            uint16_t b = color555 & 0x1F;
+            uint16_t color565 = (r << 11) | ((g << 1) << 5) | b;
+            // Store in big-endian byte order (high byte first)
+            pixels_buffer[x * 2] = (uint8_t)(color565 >> 8);       // high byte
+            pixels_buffer[x * 2 + 1] = (uint8_t)(color565 & 0xFF); // low byte
         }
     }
     else
@@ -252,7 +260,10 @@ void lcd_draw_line(struct gb_s *gb, const uint8_t pixels[LCD_WIDTH],
 #endif
         for (unsigned int x = 0; x < LCD_WIDTH; x++)
         {
-            pixels_buffer[x] = palette[(pixels[x] & LCD_PALETTE_ALL) >> 4][pixels[x] & 3];
+            uint16_t color = palette[(pixels[x] & LCD_PALETTE_ALL) >> 4][pixels[x] & 3];
+            // Store in big-endian byte order (high byte first)
+            pixels_buffer[x * 2] = (uint8_t)(color >> 8);       // high byte
+            pixels_buffer[x * 2 + 1] = (uint8_t)(color & 0xFF); // low byte
         }
 #if PEANUT_FULL_GBC_SUPPORT
     }
@@ -269,7 +280,7 @@ void lcd_draw_line(struct gb_s *gb, const uint8_t pixels[LCD_WIDTH],
     }
     else
     {
-        write_data((uint8_t *)pixels_buffer, LCD_WIDTH);
+        write_data(pixels_buffer, LCD_WIDTH);
     }
 }
 
@@ -282,9 +293,17 @@ void lcd_draw_line_bis(struct gb_s *gb, const uint8_t pixels[LCD_WIDTH],
     {
         for (unsigned int x = 0; x < LCD_WIDTH; x++)
         {
-            // Duplicate each pixel twice in the buffer
-            pixels_buffer[x * 2] = gb->cgb.fixPalette[pixels[x]] << 1;
-            pixels_buffer[x * 2 + 1] = gb->cgb.fixPalette[pixels[x]] << 1;
+            // Convert RGB555 to RGB565 properly
+            uint16_t color555 = gb->cgb.fixPalette[pixels[x]];
+            uint16_t r = (color555 >> 10) & 0x1F;
+            uint16_t g = (color555 >> 5) & 0x1F;
+            uint16_t b = color555 & 0x1F;
+            uint16_t pixel = (r << 11) | ((g << 1) << 5) | b;
+            // Duplicate each pixel twice in the buffer with correct byte order
+            pixels_buffer[x * 4] = (uint8_t)(pixel >> 8);       // high byte of first pixel
+            pixels_buffer[x * 4 + 1] = (uint8_t)(pixel & 0xFF); // low byte of first pixel
+            pixels_buffer[x * 4 + 2] = (uint8_t)(pixel >> 8);   // high byte of second pixel
+            pixels_buffer[x * 4 + 3] = (uint8_t)(pixel & 0xFF); // low byte of second pixel
         }
     }
     else
@@ -292,9 +311,12 @@ void lcd_draw_line_bis(struct gb_s *gb, const uint8_t pixels[LCD_WIDTH],
 #endif
         for (unsigned int x = 0; x < LCD_WIDTH; x++)
         {
-            // Duplicate each pixel twice in the buffer
-            pixels_buffer[x * 2] = palette[(pixels[x] & LCD_PALETTE_ALL) >> 4][pixels[x] & 3];
-            pixels_buffer[x * 2 + 1] = palette[(pixels[x] & LCD_PALETTE_ALL) >> 4][pixels[x] & 3];
+            // Duplicate each pixel twice in the buffer with correct byte order
+            uint16_t pixel = palette[(pixels[x] & LCD_PALETTE_ALL) >> 4][pixels[x] & 3];
+            pixels_buffer[x * 4] = (uint8_t)(pixel >> 8);       // high byte of first pixel
+            pixels_buffer[x * 4 + 1] = (uint8_t)(pixel & 0xFF); // low byte of first pixel
+            pixels_buffer[x * 4 + 2] = (uint8_t)(pixel >> 8);   // high byte of second pixel
+            pixels_buffer[x * 4 + 3] = (uint8_t)(pixel & 0xFF); // low byte of second pixel
         }
 #if PEANUT_FULL_GBC_SUPPORT
     }
@@ -313,9 +335,9 @@ void lcd_draw_line_bis(struct gb_s *gb, const uint8_t pixels[LCD_WIDTH],
     else
     {
         // Write double-width line twice to create vertical duplication
-        write_data((uint8_t *)pixels_buffer, LCD_WIDTH * 2);
+        write_data(pixels_buffer, LCD_WIDTH * 2);
         finish_write_data(false);
-        write_data((uint8_t *)pixels_buffer, LCD_WIDTH * 2);
+        write_data(pixels_buffer, LCD_WIDTH * 2);
     }
 }
 #endif
