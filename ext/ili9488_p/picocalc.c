@@ -4,6 +4,7 @@
 #include "picocalc.pio.h"
 #include "mono8x16.h"
 #include "i2ckbd.h"
+#include <stdio.h>
 
 static int sys_clock_hz;
 static direction_t curr_dir = EMPTY;
@@ -45,7 +46,7 @@ void init(int sys_clk_hz)
     pio_sm_set_consecutive_pindirs(spi_pio, spi_sm, PIN_SCK, 1, true);
 
     dma_tx = dma_claim_unused_channel(true);
-    
+
     gpio_init(PIN_RST);
     gpio_init(PIN_DC);
     gpio_init(PIN_LCD_CS);
@@ -67,99 +68,43 @@ void init(int sys_clk_hz)
     gpio_put(PIN_RST, 1);
     sleep_ms(10);
 
+    // Software reset - reset the commands and parameters to their S/W Reset default values
+    write_command(0x01, NULL, 0); // SWRESET
+    sleep_ms(10);                 // required to wait at least 5ms
+
+    // Pixel format set - 16 bit/pixel (RGB565)
     {
-        uint8_t data[] = {0xc3};
-        write_command(0xF0, data, sizeof(data));
-    }
-    {
-        uint8_t data[] = {0x96};
-        write_command(0xF0, data, sizeof(data));
+        uint8_t data[] = {0x55};
+        write_command(0x3A, data, sizeof(data)); // COLMOD
     }
 
+    // Memory access control - BGR colour filter panel, top to bottom, left to right
     {
         uint8_t data[] = {0x48};
-        write_command(0x36, data, sizeof(data));
+        write_command(0x36, data, sizeof(data)); // MADCTL
     }
 
+    // Display inversion on - this is critical for BGR displays
+    write_command(0x21, NULL, 0); // INVON
+
+    // Entry mode set - normal display, 16-bit (RGB) to 18-bit (rgb) colour conversion
     {
-        uint8_t data[] = {0x65};
-        write_command(0x3A, data, sizeof(data));
-    }
-    {
-        // Frame Rate Control
-        uint8_t data[] = {0xA0};
-        write_command(0xB1, data, sizeof(data));
-    }
-    {
-        uint8_t data[] = {0x00};
-        write_command(0xB4, data, sizeof(data));
-    }
-    {
-        uint8_t data[] = {0xc6};
-        write_command(0xB7, data, sizeof(data));
-    }
-    {
-        uint8_t data[] = {0x02, 0xE0};
-        write_command(0xB9, data, sizeof(data));
+        uint8_t data[] = {0xC6};
+        write_command(0xB7, data, sizeof(data)); // EMS
     }
 
+    // Vertical scroll definition
     {
-        uint8_t data[] = {0x80, 0x06};
-        write_command(0xC0, data, sizeof(data));
+        uint8_t data[] = {0x00, 0x00, 0x01, 0x40, 0x00, 0x00}; // top fixed: 0, scroll: 320, bottom fixed: 0
+        write_command(0x33, data, sizeof(data));               // VSCRDEF
     }
 
-    {
-        uint8_t data[] = {0x15};
-        write_command(0xC1, data, sizeof(data));
-    }
+    // Sleep out
+    write_command(0x11, NULL, 0); // SLPOUT
+    sleep_ms(10);                 // required to wait at least 5ms
 
-    {
-        uint8_t data[] = {0xA7};
-        write_command(0xC2, data, sizeof(data));
-    }
-    {
-        uint8_t data[] = {0x04};
-        write_command(0xC5, data, sizeof(data));
-    }
-
-    {
-        uint8_t data[] = {0x40, 0x8A, 0x00, 0x00, 0x29, 0x19, 0xAA, 0x33};
-        write_command(0xE8, data, sizeof(data));
-    }
-
-    {
-        uint8_t data[] = {0xF0, 0x06, 0x0F, 0x05, 0x04, 0x20, 0x37, 0x33, 0x4C, 0x37, 0x13, 0x14, 0x2B, 0x31};
-        write_command(0xE0, data, sizeof(data));
-    }
-
-    {
-        uint8_t data[] = {0xF0, 0x11, 0x1B, 0x11, 0x0F, 0x0A, 0x37, 0x43, 0x4C, 0x37, 0x13, 0x13, 0x2C, 0x32};
-        write_command(0xE1, data, sizeof(data));
-    }
-
-    {
-        uint8_t data[] = {0x3C};
-        write_command(0xF0, data, sizeof(data));
-    }
-
-    {
-        uint8_t data[] = {0x69};
-        write_command(0xF0, data, sizeof(data));
-    }
-
-    {
-        uint8_t data[] = {0x00};
-        write_command(0x35, data, sizeof(data));
-    }
-    write_command(0x11, NULL, 0); // TFT_SLPOUT
-    sleep_ms(120);
-    // TFT_INVON
-    write_command(0x21, NULL, 0);
-
-    //clear(0);
-
-    write_command(0x29, NULL, 0); // TFT_DISPON
-    sleep_ms(120);
+    // Display on
+    write_command(0x29, NULL, 0); // DISPON
 
     {
         uint8_t data[] = {0x00, 0x00, 0x01, 0x3F};
@@ -179,7 +124,7 @@ void setup_pio(direction_t new_dir, int new_speed)
         return;
 
     float div = sys_clock_hz / 2.f / new_speed;
-    //printf("SPI: %d MHz, %d\n", new_speed / 1000000, (int)div);
+    // printf("SPI: %d MHz, %d\n", new_speed / 1000000, (int)div);
     pio_sm_set_enabled(spi_pio, spi_sm, false);
 
     // load new PIO
@@ -225,16 +170,18 @@ void set_spi_speed(int new_speed)
 void clear(uint16_t color)
 {
     uint8_t data[WIDTH * 2];
-    for (int x = 0; x < WIDTH * 2; x++)
+    // Use color directly - display hardware handles BGR conversion via MADCTL
+    for (int x = 0; x < WIDTH * 2; x += 2)
     {
-        data[x] = color;
+        data[x] = (uint8_t)(color >> 8);       // high byte
+        data[x + 1] = (uint8_t)(color & 0xFF); // low byte
     }
     start_window(0, 0, WIDTH, HEIGHT);
     for (int y = 0; y < HEIGHT; y++)
     {
         write_data(data, WIDTH);
-        //start_write_data(0, y, WIDTH, 1, data);
-        //finish_write_data(true);
+        // start_write_data(0, y, WIDTH, 1, data);
+        // finish_write_data(true);
     }
     finish_write_data(true);
 }
@@ -283,7 +230,7 @@ void start_write_data(int x0, int y0, int w, int h, uint8_t *data)
 
             dma_start_channel_mask(1u << dma_tx);
         }*/
-            
+
         dma_channel_transfer_from_buffer_now(dma_tx, data, (w * h * 2));
     }
 }
@@ -320,7 +267,7 @@ void start_window(int x0, int y0, int w, int h)
 
 void write_data(uint8_t *data, uint16_t length)
 {
-    dma_channel_transfer_from_buffer_now(dma_tx, data, length*2);
+    dma_channel_transfer_from_buffer_now(dma_tx, data, length * 2);
     /* Start the DMA transfer
     dma_channel_config dma_cfg = dma_channel_get_default_config(dma_tx);
     channel_config_set_transfer_data_size(&dma_cfg, DMA_SIZE_8);
@@ -334,7 +281,8 @@ void write_data(uint8_t *data, uint16_t length)
                           true);                 // Start immediately */
 }
 
-void start_game(){
+void start_game()
+{
     // Setup DMA
     dma_channel_config dma_cfg = dma_channel_get_default_config(dma_tx);
     channel_config_set_transfer_data_size(&dma_cfg, DMA_SIZE_8);
@@ -344,7 +292,7 @@ void start_game(){
     dma_channel_configure(dma_tx, &dma_cfg,
                           &spi_pio->txf[spi_sm], // write address
                           NULL,                  // read address
-                          0,            // element count (each element is of size transfer_data_size)
+                          0,                     // element count (each element is of size transfer_data_size)
                           false);                // Start immediately
 }
 
