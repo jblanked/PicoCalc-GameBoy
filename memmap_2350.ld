@@ -1,30 +1,11 @@
-/* Based on GCC ARM embedded samples .
-   Defines the following symbols for use by code:
-    __exidx_start
-    __exidx_end
-    __etext
-    __data_start__
-    __preinit_array_start
-    __preinit_array_end
-    __init_array_start
-    __init_array_end
-    __fini_array_start
-    __fini_array_end
-    __data_end__
-    __bss_start__
-    __bss_end__
-    __end__
-    end
-    __HeapLimit
-    __StackLimit
-    __StackTop
-    __stack (== StackTop)
-*/
+
+_bootloader_app_size = 8k;
+_bootloader_ram_size = 8k;
 
 MEMORY
 {
-    FLASH(rx) : ORIGIN = 0x10000000 + 8k, LENGTH = 4096k - 8k
-    RAM(rwx) : ORIGIN =  0x20000000, LENGTH = 512k - 8k
+    FLASH(rx) : ORIGIN = 0x10000000, LENGTH = 4096k - _bootloader_app_size
+    RAM(rwx) : ORIGIN =  0x20080000-_bootloader_ram_size, LENGTH = 512k - _bootloader_ram_size
     SCRATCH_X(rwx) : ORIGIN = 0x20080000, LENGTH = 4k
     SCRATCH_Y(rwx) : ORIGIN = 0x20081000, LENGTH = 4k
 }
@@ -227,11 +208,10 @@ SECTIONS
         __end__ = .;
         end = __end__;
         KEEP(*(.heap*))
-        /* historically on GCC sbrk was growing past __HeapLimit to __StackLimit, however
-           to be more compatible, we now set __HeapLimit explicitly to where the end of the heap is */
-        . = ORIGIN(RAM) + LENGTH(RAM);
-        __HeapLimit = .;
     } > RAM
+    /* historically on GCC sbrk was growing past __HeapLimit to __StackLimit, however
+       to be more compatible, we now set __HeapLimit explicitly to where the end of the heap is */
+    __HeapLimit = ORIGIN(RAM) + LENGTH(RAM);
 
     /* Start and end symbols must be word-aligned */
     .scratch_x : {
@@ -300,3 +280,4 @@ SECTIONS
 
     /* todo assert on extra code */
 }
+
