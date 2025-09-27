@@ -43,7 +43,7 @@ target_include_directories(PocketPico PRIVATE inc ext/hedley ext/peanut-gb ext/m
 
 target_link_libraries(PocketPico
         FatFs_SPI
-        pico_stdlib pico_stdio pico_bootrom pico_multicore pico_multicore
+        pico_stdlib pico_stdio pico_bootrom pico_multicore
         hardware_clocks hardware_pio hardware_vreg hardware_pio hardware_flash
         hardware_sync hardware_pll hardware_spi hardware_irq hardware_dma
         pico_binary_info ili9488_p audio)

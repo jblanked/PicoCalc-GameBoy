@@ -393,7 +393,6 @@ int input_pins[] = {
 
 static void __attribute__((optimize("-Os"))) __not_in_flash_func(timer_tick_cb)(unsigned alarm)
 {
-
     absolute_time_t next;
     update_us_since_boot(&next, to_us_since_boot(now) + (TICKSPERSEC));
     if (hardware_alarm_set_target(0, next))

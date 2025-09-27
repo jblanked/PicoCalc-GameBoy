@@ -132,10 +132,8 @@ struct minigb_apu_ctx apu_ctx = {0};
  * Once done, we can access this at XIP_BASE + 1Mb.
  * Game Boy DMG ROM size ranges from 32768 bytes (e.g. Tetris) to 1,048,576 bytes (e.g. Pokemod Red)
  */
-// #define FLASH_TARGET_OFFSET ((1024 * 1024) + (256 * 1024))
-#define FLASH_TARGET_OFFSET ((1024 * 1024) + (256 * 1024))
-uint32_t _flash_target_offset = 0;
-//const uint8_t *rom = (const uint8_t *)FLASH_TARGET_OFFSET;
+#define FLASH_TARGET_OFFSET (1024 * 1024)
+uint32_t app_start_offset = 0;
 const uint8_t *rom;
 static unsigned 
 char rom_bank0[65536];
@@ -519,7 +517,7 @@ finish:
     f_unmount(sd->pcName);
 }
 
-static inline int FLASH_ERASE(uintptr_t address, uint32_t size_bytes)
+int flash_erase(uintptr_t address, uint32_t size_bytes)
 {
     cflash_flags_t cflash_flags = {(CFLASH_OP_VALUE_ERASE << CFLASH_OP_LSB) |
                                    (CFLASH_SECLEVEL_VALUE_SECURE << CFLASH_SECLEVEL_LSB) |
@@ -528,11 +526,11 @@ static inline int FLASH_ERASE(uintptr_t address, uint32_t size_bytes)
     // Round up size_bytes or rom_flash_op will throw an alignment error
     uint32_t size_aligned = (size_bytes + 0x1FFF) & -FLASH_SECTOR_SIZE;
 
-    int ret = rom_flash_op(cflash_flags, address + XIP_BASE, size_aligned, NULL);
+    int ret = rom_flash_op(cflash_flags, address + app_start_offset, size_aligned, NULL);
 
     if (ret != PICO_OK)
     {   
-        DBG_INFO("E FLASH_ERASE error: %d, address %08x\n", ret, address + XIP_BASE);
+        DBG_INFO("E FLASH_ERASE error: %d, address %08x\n", ret, address + app_start_offset);
         // need to debug all of these
         while(1);
     }
@@ -542,16 +540,16 @@ static inline int FLASH_ERASE(uintptr_t address, uint32_t size_bytes)
     return ret;
 }
 
-static inline int FLASH_PROG(uintptr_t address, const void *buf, uint32_t size_bytes)
+int flash_program(uintptr_t address, const void *buf, uint32_t size_bytes)
 {
     cflash_flags_t cflash_flags = {(CFLASH_OP_VALUE_PROGRAM << CFLASH_OP_LSB) |
                                    (CFLASH_SECLEVEL_VALUE_SECURE << CFLASH_SECLEVEL_LSB) |
                                    (CFLASH_ASPACE_VALUE_RUNTIME << CFLASH_ASPACE_LSB)};
 
-    int ret = rom_flash_op(cflash_flags, address + XIP_BASE, size_bytes, (void *)buf);
+    int ret = rom_flash_op(cflash_flags, address + app_start_offset, size_bytes, (void *)buf);
     if (ret != PICO_OK)
     {   
-        DBG_INFO("E FLASH_PROG error: %d, address %08x\n", ret, address + XIP_BASE);
+        DBG_INFO("E FLASH_PROG error: %d, address %08x\n", ret, address + app_start_offset);
         // need to debug all of these
         while(1);
     }
@@ -581,38 +579,33 @@ void load_cart_rom_file(char *filename)
     if (fr == FR_OK)
     {
         uint32_t flash_target_offset = FLASH_TARGET_OFFSET;
+        uint32_t ctl_flash = 0;
         for (;;)
         {
             f_read(&fil, buffer, sizeof buffer, &br);
             if (br == 0)
                 break; /* end of file */
 
-            /*
             DBG_INFO("I Erasing target region...\n");
-            flash_range_erase(flash_target_offset, FLASH_SECTOR_SIZE);
+            flash_erase(flash_target_offset, FLASH_SECTOR_SIZE);
             DBG_INFO("I Programming target region...\n");
-            flash_range_program(flash_target_offset, buffer, FLASH_SECTOR_SIZE);
-            */
-            
-            DBG_INFO("I Erasing target region...\n");
-            FLASH_ERASE(flash_target_offset, FLASH_SECTOR_SIZE);
-            DBG_INFO("I Programming target region...\n");
-            FLASH_PROG(flash_target_offset, buffer, FLASH_SECTOR_SIZE);
+            flash_program(flash_target_offset, buffer, FLASH_SECTOR_SIZE);
             
             /* Read back target region and check programming */
             DBG_INFO("I Done. Reading back target region...\n");
             for (uint32_t i = 0; i < FLASH_SECTOR_SIZE; i++)
             {
-                if (rom[flash_target_offset + i] != buffer[i])
+                if (rom[ctl_flash + i] != buffer[i])
                 {   
                     DBG_INFO("E Mismatch at address 0x%08X: read 0x%02X, expected 0x%02X\n",
                              (unsigned)(flash_target_offset + i),
-                             rom[flash_target_offset + i], buffer[i]);
+                             rom[ctl_flash + i], buffer[i]);
                     mismatch = true;
                 }
             }
 
             /* Next sector */
+            ctl_flash += FLASH_SECTOR_SIZE;
             flash_target_offset += FLASH_SECTOR_SIZE;
         }
         if (!mismatch)
@@ -805,7 +798,9 @@ void rom_file_selector()
 #if ENABLE_SOUND
 
 void core1_audio(void)
-{
+{   
+    flash_safe_execute_core_init();
+
     /* Allocate memory for the stream buffer */
     stream = malloc(AUDIO_SAMPLES_TOTAL * sizeof(int16_t));
     assert(stream != NULL);
@@ -854,7 +849,6 @@ int main(void)
 {
     static struct gb_s gb;
     enum gb_init_error_e ret;
-    uint32_t app_size = 0;
     const int buf_words = (16 * 4) + 1; // maximum of 16 partitions, each with maximum of 4 words returned, plus 1
     uint32_t *buffer = malloc(buf_words * 4);
 
@@ -865,7 +859,7 @@ int main(void)
 
     stdio_init_all();
 
-    sleep_us(500000); // 5s delay to allow time to connect a serial console
+    sleep_us(4000000); // 4s delay to allow time to connect a serial console
     DBG_INIT();
     DBG_INFO("INIT: ");
 
@@ -874,14 +868,13 @@ int main(void)
 #endif
 
     /* Memory management */
+    flash_safe_execute_core_init(); 
     rom_get_partition_table_info(buffer, buf_words, PT_INFO_PARTITION_LOCATION_AND_FLAGS | PT_INFO_SINGLE_PARTITION | (0 << 24));
     uint32_t location_and_permissions = buffer[1];
 
-    //_flash_target_offset = ((location_and_permissions & PICOBIN_PARTITION_LOCATION_FIRST_SECTOR_BITS) >> PICOBIN_PARTITION_LOCATION_FIRST_SECTOR_LSB) * FLASH_SECTOR_SIZE;
-    uint32_t app_start_offset = XIP_BASE + ((location_and_permissions & PICOBIN_PARTITION_LOCATION_FIRST_SECTOR_BITS) >> PICOBIN_PARTITION_LOCATION_FIRST_SECTOR_LSB) * FLASH_SECTOR_SIZE;
+    app_start_offset  = XIP_BASE + ((location_and_permissions & PICOBIN_PARTITION_LOCATION_FIRST_SECTOR_BITS) >> PICOBIN_PARTITION_LOCATION_FIRST_SECTOR_LSB) * FLASH_SECTOR_SIZE;
     uint32_t end_addr = XIP_BASE + (((location_and_permissions & PICOBIN_PARTITION_LOCATION_LAST_SECTOR_BITS) >> PICOBIN_PARTITION_LOCATION_LAST_SECTOR_LSB) + 1) * FLASH_SECTOR_SIZE;
-    app_size = end_addr - app_start_offset;
-        
+            
     rom = (const uint8_t *)(app_start_offset+FLASH_TARGET_OFFSET);
     printf("Start %08x, end %08x, rom %08x\n", app_start_offset, end_addr, rom);
 
