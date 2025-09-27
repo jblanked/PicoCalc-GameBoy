@@ -56,6 +56,7 @@
 #include <pico/bootrom.h>
 #include <pico/stdlib.h>
 #include <pico/multicore.h>
+#include "pico/util/queue.h"
 #include <sys/unistd.h>
 #include <hardware/irq.h>
 
@@ -98,6 +99,12 @@ typedef enum
     AUDIO_CMD_INVALID
 } audio_commands_e;
 
+typedef struct
+{
+    audio_commands_e audio_cmd;
+} queue_audio;
+queue_t call_queue;
+
 #define audio_read(a) audio_read(&apu_ctx, (a))
 #define audio_write(a, v) audio_write(&apu_ctx, (a), (v));
 
@@ -132,7 +139,7 @@ struct minigb_apu_ctx apu_ctx = {0};
  * Once done, we can access this at XIP_BASE + 1Mb.
  * Game Boy DMG ROM size ranges from 32768 bytes (e.g. Tetris) to 1,048,576 bytes (e.g. Pokemod Red)
  */
-#define FLASH_TARGET_OFFSET ((1024 * 1024) + (8 * 1024))
+#define FLASH_TARGET_OFFSET (1024 * 1024)
 const uint8_t *rom = (const uint8_t *)(XIP_BASE + FLASH_TARGET_OFFSET);
 static unsigned 
 char rom_bank0[65536];
@@ -818,8 +825,10 @@ void core1_audio(void)
     DBG_INFO("I Audio ready on core1.\n");
 
     while (1)
-    {
-        audio_commands_e cmd = multicore_fifo_pop_blocking_inline();
+    {   
+        queue_audio entry;
+        queue_remove_blocking(&call_queue, &entry);
+        audio_commands_e cmd = entry.audio_cmd;
         switch (cmd)
         {
         case AUDIO_CMD_PLAYBACK:
@@ -828,6 +837,7 @@ void core1_audio(void)
             break;
 
         case AUDIO_CMD_VOLUME_UP:
+            //flash_safe_execute_core_deinit();
             i2s_increase_volume(&i2s_config);
             break;
 
@@ -839,7 +849,7 @@ void core1_audio(void)
             break;
         }
     }
-    
+
     DBG_INFO("I Audio stop on core1.\n");
     HEDLEY_UNREACHABLE();
 }
@@ -858,12 +868,12 @@ int main(void)
     set_sys_clock_khz(SYS_CLK_FREQ / 1000, true);
     
     stdio_init_all();
-
-    sleep_us(4000000); // 4s delay to allow time to connect a serial console
     DBG_INIT();
     DBG_INFO("INIT: ");
 
 #if ENABLE_SOUND
+    queue_audio q_audio = {AUDIO_CMD_IDLE};
+    queue_init(&call_queue, sizeof(queue_audio), 2);
     multicore_launch_core1(core1_audio);
 #endif
 
@@ -945,7 +955,8 @@ int main(void)
 #if ENABLE_SOUND
             if (!gb.direct.frame_skip)
             {
-                multicore_fifo_push_blocking_inline(AUDIO_CMD_PLAYBACK);
+                q_audio.audio_cmd = AUDIO_CMD_PLAYBACK;
+                queue_add_blocking(&call_queue, &q_audio);
             }
 #endif
             /* Update buttons state */
@@ -973,12 +984,14 @@ int main(void)
                 if (!gb.direct.joypad_bits.up && prev_joypad_bits.up)
                 {
                     /* select + up: increase sound volume */
-                    multicore_fifo_push_blocking_inline(AUDIO_CMD_VOLUME_UP);
+                    q_audio.audio_cmd = AUDIO_CMD_VOLUME_UP;
+                    queue_add_blocking(&call_queue, &q_audio);
                 }
                 if (!gb.direct.joypad_bits.down && prev_joypad_bits.down)
                 {
                     /* select + down: decrease sound volume */
-                    multicore_fifo_push_blocking_inline(AUDIO_CMD_VOLUME_DOWN);
+                    q_audio.audio_cmd = AUDIO_CMD_VOLUME_DOWN;
+                    queue_add_blocking(&call_queue, &q_audio);
                 }
 #endif
                 if (!gb.direct.joypad_bits.right && prev_joypad_bits.right)
