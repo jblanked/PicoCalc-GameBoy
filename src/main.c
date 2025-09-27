@@ -132,9 +132,8 @@ struct minigb_apu_ctx apu_ctx = {0};
  * Once done, we can access this at XIP_BASE + 1Mb.
  * Game Boy DMG ROM size ranges from 32768 bytes (e.g. Tetris) to 1,048,576 bytes (e.g. Pokemod Red)
  */
-#define FLASH_TARGET_OFFSET (1024 * 1024)
-uint32_t app_start_offset = 0;
-const uint8_t *rom;
+#define FLASH_TARGET_OFFSET ((1024 * 1024) + (8 * 1024))
+const uint8_t *rom = (const uint8_t *)(XIP_BASE + FLASH_TARGET_OFFSET);
 static unsigned 
 char rom_bank0[65536];
 
@@ -526,11 +525,11 @@ int flash_erase(uintptr_t address, uint32_t size_bytes)
     // Round up size_bytes or rom_flash_op will throw an alignment error
     uint32_t size_aligned = (size_bytes + 0x1FFF) & -FLASH_SECTOR_SIZE;
 
-    int ret = rom_flash_op(cflash_flags, address + app_start_offset, size_aligned, NULL);
+    int ret = rom_flash_op(cflash_flags, address + XIP_BASE, size_aligned, NULL);
 
     if (ret != PICO_OK)
     {   
-        DBG_INFO("E FLASH_ERASE error: %d, address %08x\n", ret, address + app_start_offset);
+        DBG_INFO("E FLASH_ERASE error: %d, address %08x\n", ret, address + XIP_BASE);
         // need to debug all of these
         while(1);
     }
@@ -546,10 +545,10 @@ int flash_program(uintptr_t address, const void *buf, uint32_t size_bytes)
                                    (CFLASH_SECLEVEL_VALUE_SECURE << CFLASH_SECLEVEL_LSB) |
                                    (CFLASH_ASPACE_VALUE_RUNTIME << CFLASH_ASPACE_LSB)};
 
-    int ret = rom_flash_op(cflash_flags, address + app_start_offset, size_bytes, (void *)buf);
+    int ret = rom_flash_op(cflash_flags, address + XIP_BASE, size_bytes, (void *)buf);
     if (ret != PICO_OK)
     {   
-        DBG_INFO("E FLASH_PROG error: %d, address %08x\n", ret, address + app_start_offset);
+        DBG_INFO("E FLASH_PROG error: %d, address %08x\n", ret, address + XIP_BASE);
         // need to debug all of these
         while(1);
     }
@@ -840,7 +839,8 @@ void core1_audio(void)
             break;
         }
     }
-
+    
+    DBG_INFO("I Audio stop on core1.\n");
     HEDLEY_UNREACHABLE();
 }
 #endif
@@ -856,7 +856,7 @@ int main(void)
     vreg_set_voltage(VREG_VOLTAGE_1_30);
     sleep_ms(100);
     set_sys_clock_khz(SYS_CLK_FREQ / 1000, true);
-
+    
     stdio_init_all();
 
     sleep_us(4000000); // 4s delay to allow time to connect a serial console
@@ -867,8 +867,7 @@ int main(void)
     multicore_launch_core1(core1_audio);
 #endif
 
-    /* Memory management */
-    flash_safe_execute_core_init(); 
+    /* Memory management 
     rom_get_partition_table_info(buffer, buf_words, PT_INFO_PARTITION_LOCATION_AND_FLAGS | PT_INFO_SINGLE_PARTITION | (0 << 24));
     uint32_t location_and_permissions = buffer[1];
 
@@ -876,7 +875,7 @@ int main(void)
     uint32_t end_addr = XIP_BASE + (((location_and_permissions & PICOBIN_PARTITION_LOCATION_LAST_SECTOR_BITS) >> PICOBIN_PARTITION_LOCATION_LAST_SECTOR_LSB) + 1) * FLASH_SECTOR_SIZE;
             
     rom = (const uint8_t *)(app_start_offset+FLASH_TARGET_OFFSET);
-    printf("Start %08x, end %08x, rom %08x\n", app_start_offset, end_addr, rom);
+    printf("Start %08x, end %08x, rom %08x\n", app_start_offset, end_addr, rom);*/
 
 #if ENABLE_LCD
     init(SYS_CLK_FREQ);
