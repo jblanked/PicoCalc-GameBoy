@@ -99,10 +99,6 @@ typedef enum
     AUDIO_CMD_INVALID
 } audio_commands_e;
 
-typedef struct
-{
-    audio_commands_e audio_cmd;
-} queue_audio;
 queue_t call_queue;
 
 #define audio_read(a) audio_read(&apu_ctx, (a))
@@ -525,6 +521,10 @@ finish:
 
 int flash_erase(uintptr_t address, uint32_t size_bytes)
 {
+#if PICO_RP2040
+    flash_range_erase(address, size_bytes);
+    return 0;
+#elif PICO_RP2350
     cflash_flags_t cflash_flags = {(CFLASH_OP_VALUE_ERASE << CFLASH_OP_LSB) |
                                    (CFLASH_SECLEVEL_VALUE_SECURE << CFLASH_SECLEVEL_LSB) |
                                    (CFLASH_ASPACE_VALUE_RUNTIME << CFLASH_ASPACE_LSB)};
@@ -544,10 +544,16 @@ int flash_erase(uintptr_t address, uint32_t size_bytes)
     rom_flash_flush_cache();
 
     return ret;
+#endif
 }
 
 int flash_program(uintptr_t address, const void *buf, uint32_t size_bytes)
 {
+#if PICO_RP2040
+    flash_range_program(address, buf, size_bytes);
+    return 0;
+
+#elif PICO_RP2350
     cflash_flags_t cflash_flags = {(CFLASH_OP_VALUE_PROGRAM << CFLASH_OP_LSB) |
                                    (CFLASH_SECLEVEL_VALUE_SECURE << CFLASH_SECLEVEL_LSB) |
                                    (CFLASH_ASPACE_VALUE_RUNTIME << CFLASH_ASPACE_LSB)};
@@ -563,6 +569,7 @@ int flash_program(uintptr_t address, const void *buf, uint32_t size_bytes)
     rom_flash_flush_cache();
 
     return ret;
+#endif
 }
 
 /**
@@ -783,7 +790,6 @@ void rom_file_selector()
             if (selected >= num_file)
                 selected = 0;
             DBG_INFO("ROM File Selector: Selected ROM: %s\n", filename[selected]);
-            // ili9488_text(filename[selected], 0, selected*8, 0xFFFF, 0xF800);
             sprintf(buf, "%02d", selected + 1);
             draw_string(0, FRAME_BUFF_HEIGHT - 20, buf);
             draw_string(0, (selected % 22) * 20, "=>");
@@ -826,9 +832,8 @@ void core1_audio(void)
 
     while (1)
     {   
-        queue_audio entry;
-        queue_remove_blocking(&call_queue, &entry);
-        audio_commands_e cmd = entry.audio_cmd;
+        audio_commands_e cmd;
+        queue_remove_blocking(&call_queue, &cmd);
         switch (cmd)
         {
         case AUDIO_CMD_PLAYBACK:
@@ -872,20 +877,10 @@ int main(void)
     DBG_INFO("INIT: ");
 
 #if ENABLE_SOUND
-    queue_audio q_audio = {AUDIO_CMD_IDLE};
-    queue_init(&call_queue, sizeof(queue_audio), 2);
+    audio_commands_e q_audio = AUDIO_CMD_IDLE;
+    queue_init(&call_queue, sizeof(audio_commands_e), 2);
     multicore_launch_core1(core1_audio);
 #endif
-
-    /* Memory management 
-    rom_get_partition_table_info(buffer, buf_words, PT_INFO_PARTITION_LOCATION_AND_FLAGS | PT_INFO_SINGLE_PARTITION | (0 << 24));
-    uint32_t location_and_permissions = buffer[1];
-
-    app_start_offset  = XIP_BASE + ((location_and_permissions & PICOBIN_PARTITION_LOCATION_FIRST_SECTOR_BITS) >> PICOBIN_PARTITION_LOCATION_FIRST_SECTOR_LSB) * FLASH_SECTOR_SIZE;
-    uint32_t end_addr = XIP_BASE + (((location_and_permissions & PICOBIN_PARTITION_LOCATION_LAST_SECTOR_BITS) >> PICOBIN_PARTITION_LOCATION_LAST_SECTOR_LSB) + 1) * FLASH_SECTOR_SIZE;
-            
-    rom = (const uint8_t *)(app_start_offset+FLASH_TARGET_OFFSET);
-    printf("Start %08x, end %08x, rom %08x\n", app_start_offset, end_addr, rom);*/
 
 #if ENABLE_LCD
     init(SYS_CLK_FREQ);
@@ -950,12 +945,12 @@ int main(void)
 
             /* Execute CPU cycles until the screen has to be redrawn. */
             gb_run_frame(&gb);
-
             frames++;
+
 #if ENABLE_SOUND
             if (!gb.direct.frame_skip)
             {
-                q_audio.audio_cmd = AUDIO_CMD_PLAYBACK;
+                q_audio = AUDIO_CMD_PLAYBACK;
                 queue_add_blocking(&call_queue, &q_audio);
             }
 #endif
@@ -984,13 +979,13 @@ int main(void)
                 if (!gb.direct.joypad_bits.up && prev_joypad_bits.up)
                 {
                     /* select + up: increase sound volume */
-                    q_audio.audio_cmd = AUDIO_CMD_VOLUME_UP;
+                    q_audio = AUDIO_CMD_VOLUME_UP;
                     queue_add_blocking(&call_queue, &q_audio);
                 }
                 if (!gb.direct.joypad_bits.down && prev_joypad_bits.down)
                 {
                     /* select + down: decrease sound volume */
-                    q_audio.audio_cmd = AUDIO_CMD_VOLUME_DOWN;
+                    q_audio = AUDIO_CMD_VOLUME_DOWN;
                     queue_add_blocking(&call_queue, &q_audio);
                 }
 #endif
