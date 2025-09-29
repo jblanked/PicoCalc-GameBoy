@@ -324,36 +324,11 @@ void draw_string(int x, int y, const char *str)
 }
 
 /**
- * Clear Frame Buffer
- * 
- * Clears the frame buffer area of the screen (the Game Boy display area).
- * Since we're using direct display, this function clears the screen directly
- * instead of filling a buffer.
- */
-void clear_frame_buff()
-{
-    // Set window to frame buffer area
-    start_window((WIDTH - FRAME_BUFF_WIDTH) / 2, (HEIGHT - FRAME_BUFF_HEIGHT) / 2, 
-                 FRAME_BUFF_WIDTH, FRAME_BUFF_HEIGHT);
-    
-    // Temporary buffer for a clear line
-    uint8_t clear_line[FRAME_BUFF_WIDTH * 2] = {0};
-    
-    // Clear the screen line by line
-    for (int y = 0; y < FRAME_BUFF_HEIGHT; y++) {
-        write_data(clear_line, FRAME_BUFF_WIDTH);
-        finish_write_data(false);
-    }
-    
-    finish_write_data(true);
-}
-
-/**
  * Clear Entire Screen
  * 
  * Clears the entire screen, not just the frame buffer area.
  */
-void clear_screen_buff()
+void clear_screen()
 {
     // Set window to entire screen
     start_window(0, 0, WIDTH, HEIGHT);
@@ -841,7 +816,7 @@ uint16_t rom_file_selector_display_page(char filename[22][256], uint16_t num_pag
     f_unmount(pSD->pcName);
 
     /* display *.gb rom files on screen */
-    clear_frame_buff();
+    clear_screen();
     for (uint8_t ifile = 0; ifile < num_file; ifile++)
     {
         DBG_INFO("Game: %s\n", filename[ifile]);
@@ -1050,11 +1025,6 @@ int main(void)
 
     while (true)
     {
-
-#if ENABLE_LCD
-        clear_screen_buff();
-#endif
-
 #if ENABLE_SDCARD
         /* ROM File selector */
         rom_file_selector();
@@ -1062,7 +1032,7 @@ int main(void)
 
 #if ENABLE_LCD
         set_spi_speed(SYS_CLK_FREQ / 4);
-        clear_frame_buff();
+        clear_screen();
 #endif
         /* Initialize Game Boy emulator */
         memcpy(rom_bank0, rom, sizeof(rom_bank0));  // Copy ROM bank 0 to RAM for faster access
