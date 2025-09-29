@@ -14,25 +14,36 @@
  * PERFORMANCE OF THIS SOFTWARE.
  */
 
+/**
+ * PocketPico - Game Boy Emulator for Raspberry Pi Pico
+ * 
+ * This file contains the main program for the PocketPico Game Boy emulator.
+ * It handles ROM loading, display rendering, input processing, save file management,
+ * and audio playback using the Peanut-GB emulator core.
+ */
+
 // Peanut-GB emulator settings
-#define ENABLE_LCD 1
-#define ENABLE_SOUND 1
-#define ENABLE_SDCARD 1
-#define PEANUT_GB_HIGH_LCD_ACCURACY 1
-#define PEANUT_GB_USE_BIOS 0
-#define PEANUT_FULL_GBC_SUPPORT 0
-#define SYS_CLK_FREQ 300 * MHZ
+/* Core emulator feature configuration */
+#define ENABLE_LCD 1                  // Enable LCD display output
+#define ENABLE_SOUND 1                // Enable sound output
+#define ENABLE_SDCARD 1               // Enable SD card for ROM and save storage
+#define PEANUT_GB_HIGH_LCD_ACCURACY 1 // Use high accuracy LCD emulation
+#define PEANUT_GB_USE_BIOS 0          // Don't use GB BIOS (use built-in boot code)
+#define PEANUT_FULL_GBC_SUPPORT 0     // Disable full Game Boy Color support
+#define SYS_CLK_FREQ 300 * MHZ        // Set system clock to 300 MHz
 
-#define ENABLE_DEBUG 1
+#define ENABLE_DEBUG 1                // Enable debug output
 
-// Display selection
-#define USE_ILI9225 0
-#define USE_ILI9488 1
+/* Display hardware configuration */
+#define USE_ILI9225 0                 // Disable ILI9225 display driver
+#define USE_ILI9488 1                 // Enable ILI9488 display driver
 
 /**
- * Reducing VSYNC calculation to lower multiple.
+ * VSYNC Timing Configuration
+ * 
+ * Reduces VSYNC calculation to a lower multiple for better performance.
  * When setting a clock IRQ to DMG_CLOCK_FREQ_REDUCED, count to
- * SCREEN_REFRESH_CYCLES_REDUCED to obtain the time required each VSYNC.
+ * SCREEN_REFRESH_CYCLES_REDUCED to obtain the time required for each VSYNC.
  * DMG_CLOCK_FREQ_REDUCED = 2^18, and SCREEN_REFRESH_CYCLES_REDUCED = 4389.
  * Currently unused.
  */
@@ -40,11 +51,11 @@
 #define SCREEN_REFRESH_CYCLES_REDUCED (SCREEN_REFRESH_CYCLES / VSYNC_REDUCTION_FACTOR)
 #define DMG_CLOCK_FREQ_REDUCED (DMG_CLOCK_FREQ / VSYNC_REDUCTION_FACTOR)
 
-/* C Headers */
+/* Standard C Headers */
 #include <stdlib.h>
 #include <string.h>
 
-/* RP2040 Headers */
+/* Raspberry Pi Pico SDK Headers */
 #include <hardware/pio.h>
 #include <hardware/clocks.h>
 #include <hardware/dma.h>
@@ -63,64 +74,56 @@
 #include "boot/picobin.h"
 #include "hardware/watchdog.h"
 
-/* Project headers */
-// #include "pwm_audio.h"
-#include "debug.h"
-#include "hedley.h"
-#include "minigb_apu.h"
-#include "sdcard.h"
+/* Project Headers */
+#include "debug.h"             // Debug output functionality
+#include "hedley.h"            // Cross-platform compiler macros
+#include "minigb_apu.h"        // Game Boy audio processing unit emulation
+#include "sdcard.h"            // SD card interface
+#include "gbcolors.h"          // Game Boy color palette definitions
 
-// #include "i2s.h"
-#include "gbcolors.h"
-
-#include "../ext/ili9488_p/mono8x16.h"
-
-/*
-#include "ili9488_lcd.h"
-#include "ili9488_font.h"
-#define SCREEN_WIDTH ILI9488_SCREEN_WIDTH
-#define SCREEN_HEIGHT ILI9488_SCREEN_HEIGHT
-*/
-#include "i2ckbd.h"
-#include "picocalc.h"
-
-#define FRAME_BUFF_WIDTH 240
-#define FRAME_BUFF_STRIDE (FRAME_BUFF_WIDTH * 2)
-#define FRAME_BUFF_HEIGHT 240
+/* External Component Headers */
+#include "../ext/ili9488_p/mono8x16.h" // Font for text display
+#include "i2ckbd.h"                    // I2C keyboard interface
+#include "picocalc.h"                  // PocketPico hardware interface
 
 #if ENABLE_SOUND
 
+/**
+ * Audio Command Enumeration
+ * 
+ * Defines the possible commands that can be sent to the audio processing core.
+ */
 typedef enum
 {
-    AUDIO_CMD_IDLE = 0,
-    AUDIO_CMD_PLAYBACK,
-    AUDIO_CMD_VOLUME_UP,
-    AUDIO_CMD_VOLUME_DOWN,
-    AUDIO_CMD_INVALID
+    AUDIO_CMD_IDLE = 0,        // No operation
+    AUDIO_CMD_PLAYBACK,        // Play audio samples
+    AUDIO_CMD_VOLUME_UP,       // Increase volume
+    AUDIO_CMD_VOLUME_DOWN,     // Decrease volume
+    AUDIO_CMD_INVALID          // Invalid command
 } audio_commands_e;
 
-queue_t call_queue;
+queue_t call_queue;            // Queue for communication between cores
 
 #define audio_read(a) audio_read(&apu_ctx, (a))
 #define audio_write(a, v) audio_write(&apu_ctx, (a), (v));
 
 /**
- * Global variables for audio task
- * stream contains N=AUDIO_SAMPLES samples
- * each sample is 32 bits
- * 16 bits for the left channel + 16 bits for the right channel in stereo interleaved format)
- * This is intended to be played at AUDIO_SAMPLE_RATE Hz
+ * Global Variables for Audio Processing
+ * 
+ * stream: Contains N=AUDIO_SAMPLES samples
+ * Each sample is 32 bits (16 bits for left channel + 16 bits for right channel)
+ * in stereo interleaved format. This is played at AUDIO_SAMPLE_RATE Hz.
  */
 int16_t *stream;
 struct minigb_apu_ctx apu_ctx = {0};
 
-// PWM audio driver
-#define AUDIO_DATA_PIN 26
-#define AUDIO_CLOCK_PIN 27
-#define AUDIO_PWM_PIN 26
-#define PIN_SPEAKER 26
-#define SPK_LATENCY 256
-#define SPK_PWM_FREQ 22050
+/* Audio Hardware Configuration */
+#define AUDIO_DATA_PIN 26      // I2S data pin
+#define AUDIO_CLOCK_PIN 27     // I2S clock pin
+#define AUDIO_PWM_PIN 26       // PWM output pin (same as data pin)
+#define PIN_SPEAKER 26         // Speaker connection pin
+#define SPK_LATENCY 256        // Audio buffer latency
+#define SPK_PWM_FREQ 22050     // PWM frequency for audio output
 
 #include "audio.h"
 #include "peanut_gb.h"
@@ -130,38 +133,58 @@ struct minigb_apu_ctx apu_ctx = {0};
 #include "peanut_gb.h"
 #endif
 
-/** Definition of ROM data
- * We're going to erase and reprogram a region 1Mb from the start of the flash
- * Once done, we can access this at XIP_BASE + 1Mb.
- * Game Boy DMG ROM size ranges from 32768 bytes (e.g. Tetris) to 1,048,576 bytes (e.g. Pokemod Red)
+/**
+ * ROM Storage Configuration
+ * 
+ * Defines a region in flash memory to store the Game Boy ROM.
+ * We erase and reprogram a region 1MB from the start of flash memory.
+ * Once done, we access this at XIP_BASE + 1MB.
+ * Game Boy DMG ROM sizes range from 32KB (e.g. Tetris) to 1MB (e.g. Pokemod Red)
  */
-#define FLASH_TARGET_OFFSET (1024 * 1024)
+#define FLASH_TARGET_OFFSET (1024 * 1024)  // 1MB offset from flash start
 const uint8_t *rom = (const uint8_t *)(XIP_BASE + FLASH_TARGET_OFFSET);
-static unsigned 
-char rom_bank0[65536];
+static unsigned char rom_bank0[65536];     // 64KB buffer for ROM bank 0
 
-static uint8_t ram[32768];
-static int lcd_line_busy = 0;
-static palette_t palette; // Colour palette
-static uint8_t manual_palette_selected = 0;
-
-static struct
-{
-    unsigned a : 1;
-    unsigned b : 1;
-    unsigned select : 1;
-    unsigned start : 1;
-    unsigned right : 1;
-    unsigned left : 1;
-    unsigned up : 1;
-    unsigned down : 1;
-} prev_joypad_bits;
-
-/* Pixel data is stored in here. */
-static uint8_t pixels_buffer[FRAME_BUFF_STRIDE * 240 * 2];
+static uint8_t ram[32768];                 // 32KB buffer for cartridge RAM
+static int lcd_line_busy = 0;              // Flag for LCD line rendering status
+static palette_t palette;                  // Current color palette
+static uint8_t manual_palette_selected = 0; // Index of manually selected palette
 
 /**
+ * Previous Joypad State
+ * 
+ * Stores the previous state of all joypad buttons to detect button press events.
+ * Each field is a 1-bit flag indicating whether the button was pressed.
+ */
+static struct
+{
+    unsigned a : 1;        // A button
+    unsigned b : 1;        // B button
+    unsigned select : 1;   // Select button
+    unsigned start : 1;    // Start button
+    unsigned right : 1;    // Right direction
+    unsigned left : 1;     // Left direction
+    unsigned up : 1;       // Up direction
+    unsigned down : 1;     // Down direction
+} prev_joypad_bits;
+
+/* Display Buffer Configuration */
+#define FRAME_BUFF_WIDTH 320                  // Width of frame buffer
+#define FRAME_BUFF_STRIDE (FRAME_BUFF_WIDTH * 2) // Stride of frame buffer (bytes per row)
+#define FRAME_BUFF_HEIGHT 320                 // Height of frame buffer
+
+/* Line buffer for rendering Game Boy LCD output */
+static uint8_t pixels_buffer[WIDTH*2] = {0};
+
+/**
+ * ROM Read Callback
+ * 
  * Returns a byte from the ROM file at the given address.
+ * This function is called by the Game Boy emulator when it needs to read from ROM.
+ * 
+ * @param gb Pointer to the Game Boy emulator context
+ * @param addr Address to read from
+ * @return The byte at the specified address
  */
 uint8_t gb_rom_read(struct gb_s *gb, const uint_fast32_t addr)
 {
@@ -173,7 +196,14 @@ uint8_t gb_rom_read(struct gb_s *gb, const uint_fast32_t addr)
 }
 
 /**
+ * Cartridge RAM Read Callback
+ * 
  * Returns a byte from the cartridge RAM at the given address.
+ * This function is called by the Game Boy emulator when it needs to read from cartridge RAM.
+ * 
+ * @param gb Pointer to the Game Boy emulator context
+ * @param addr Address to read from
+ * @return The byte at the specified address
  */
 uint8_t gb_cart_ram_read(struct gb_s *gb, const uint_fast32_t addr)
 {
@@ -182,7 +212,14 @@ uint8_t gb_cart_ram_read(struct gb_s *gb, const uint_fast32_t addr)
 }
 
 /**
+ * Cartridge RAM Write Callback
+ * 
  * Writes a given byte to the cartridge RAM at the given address.
+ * This function is called by the Game Boy emulator when it needs to write to cartridge RAM.
+ * 
+ * @param gb Pointer to the Game Boy emulator context
+ * @param addr Address to write to
+ * @param val Value to write
  */
 void gb_cart_ram_write(struct gb_s *gb, const uint_fast32_t addr,
                        const uint8_t val)
@@ -191,7 +228,14 @@ void gb_cart_ram_write(struct gb_s *gb, const uint_fast32_t addr,
 }
 
 /**
- * Ignore all errors.
+ * Error Handling Callback
+ * 
+ * Handles errors that occur during emulation.
+ * Currently logs the error but allows emulation to continue.
+ * 
+ * @param gb Pointer to the Game Boy emulator context
+ * @param gb_err Type of error that occurred
+ * @param addr Address where the error occurred
  */
 void gb_error(struct gb_s *gb, const enum gb_error_e gb_err, const uint16_t addr)
 {
@@ -207,91 +251,152 @@ void gb_error(struct gb_s *gb, const enum gb_error_e gb_err, const uint16_t addr
 }
 
 #if ENABLE_LCD
+/**
+ * Direct Character Rendering
+ * 
+ * Draws a character directly on the screen without using an intermediate buffer.
+ * 
+ * @param x0 X-coordinate (relative to frame buffer)
+ * @param y0 Y-coordinate (relative to frame buffer)
+ * @param c Character to draw
+ * @param color Color of the character in RGB565 format
+ */
+void draw_char_direct_rgb565(int x0, int y0, const char c, uint16_t color)
+{
+    if (c <= 0x20 || 0x80 <= c) return;
+    
+    // Calcul de la position absolue sur l'écran
+    int x_screen = (WIDTH - FRAME_BUFF_WIDTH) / 2 + x0;
+    int y_screen = (HEIGHT - FRAME_BUFF_HEIGHT) / 2 + y0;
+    
+    // Buffer temporaire juste pour un caractère (8×16 pixels × 2 octets par pixel)
+    uint8_t char_buffer[8 * 16 * 2] = {0};
+    
+    // Récupérer le bitmap du caractère
+    const uint8_t *rd_ptr = bmp + (c - 0x20) * ((8 * 16 + 7) / 8);
+    
+    // Remplir le buffer temporaire avec les pixels du caractère
+    for (int iy = 0; iy < 16; iy++) {
+        uint8_t pattern = *(rd_ptr++);
+        for (int ix = 0; ix < 8; ix++) {
+            if (pattern & 1) {
+                int wr_index = iy * 16 + ix * 2;
+                char_buffer[wr_index] = (uint8_t)(color >> 8);      // high byte
+                char_buffer[wr_index + 1] = (uint8_t)(color & 0xFF); // low byte
+            }
+            pattern >>= 1;
+        }
+    }
+    
+    // Définir la fenêtre d'affichage pour ce caractère
+    start_window(x_screen, y_screen, 8, 16);
+    
+    // Envoyer les données du caractère
+    for (int y = 0; y < 16; y++) {
+        write_data(&char_buffer[y * 16], 8);
+        finish_write_data(false);
+    }
+    
+    // Finaliser l'écriture
+    finish_write_data(true);
+}
+
+/**
+ * Direct String Rendering
+ * 
+ * Draws a string of characters directly on the screen without using an intermediate buffer.
+ * 
+ * @param x0 X-coordinate (relative to frame buffer)
+ * @param y0 Y-coordinate (relative to frame buffer)
+ * @param str String to draw
+ * @param color Color of the text in RGB565 format
+ */
+void draw_string_direct_rgb565(int x0, int y0, const char *str, uint16_t color)
+{
+    char c;
+    int curr_x = x0;
+    
+    while ((c = *(str++)) != '\0') {
+        if (curr_x + 8 > FRAME_BUFF_WIDTH) break; // Ne pas dépasser la largeur du buffer
+        draw_char_direct_rgb565(curr_x, y0, c, color);
+        curr_x += 8 + 1; // 8 pixels de large + 1 pixel d'espacement
+    }
+}
+
+/**
+ * Draw String Helper Function
+ * 
+ * Wrapper function to draw a white string at the specified position.
+ * 
+ * @param x X-coordinate (relative to frame buffer)
+ * @param y Y-coordinate (relative to frame buffer)
+ * @param str String to draw
+ */
 void draw_string(int x, int y, const char *str)
 {
-    draw_string_rgb565(
-        pixels_buffer, FRAME_BUFF_STRIDE, FRAME_BUFF_WIDTH, FRAME_BUFF_HEIGHT,
-        x, y, str, 0xffff);
+    draw_string_direct_rgb565(x, y, str, 0xffff);
 }
 
+/**
+ * Clear Frame Buffer
+ * 
+ * Clears the frame buffer area of the screen (the Game Boy display area).
+ * Since we're using direct display, this function clears the screen directly
+ * instead of filling a buffer.
+ */
 void clear_frame_buff()
 {
-    for (int i = 0; i < FRAME_BUFF_STRIDE * FRAME_BUFF_HEIGHT * 2; i++)
-    {
-        pixels_buffer[i] = 0;
+    // Set window to frame buffer area
+    start_window((WIDTH - FRAME_BUFF_WIDTH) / 2, (HEIGHT - FRAME_BUFF_HEIGHT) / 2, 
+                 FRAME_BUFF_WIDTH, FRAME_BUFF_HEIGHT);
+    
+    // Temporary buffer for a clear line
+    uint8_t clear_line[FRAME_BUFF_WIDTH * 2] = {0};
+    
+    // Clear the screen line by line
+    for (int y = 0; y < FRAME_BUFF_HEIGHT; y++) {
+        write_data(clear_line, FRAME_BUFF_WIDTH);
+        finish_write_data(false);
     }
+    
+    finish_write_data(true);
 }
 
+/**
+ * Clear Entire Screen
+ * 
+ * Clears the entire screen, not just the frame buffer area.
+ */
 void clear_screen_buff()
 {
-    for (int i = 0; i < (WIDTH)*HEIGHT * 2; i++)
-    {
-        pixels_buffer[i] = 0;
+    // Set window to entire screen
+    start_window(0, 0, WIDTH, HEIGHT);
+    
+    // Temporary buffer for a clear line
+    uint8_t clear_line[WIDTH * 2] = {0};
+    
+    // Clear the screen line by line
+    for (int y = 0; y < HEIGHT; y++) {
+        write_data(clear_line, WIDTH);
+        finish_write_data(false);
     }
-}
-
-void update_lcd()
-{
-    start_write_data((WIDTH - FRAME_BUFF_WIDTH) / 2, (HEIGHT - FRAME_BUFF_HEIGHT) / 2,
-                     FRAME_BUFF_WIDTH, FRAME_BUFF_HEIGHT, pixels_buffer);
+    
     finish_write_data(true);
 }
 
-void update_full_screen()
-{
-    start_write_data(0, 0, WIDTH, HEIGHT, pixels_buffer);
-    finish_write_data(true);
-}
-
+/**
+ * LCD Draw Line Callback
+ * 
+ * Callback function used by the Game Boy emulator to draw a line of the LCD.
+ * This function converts Game Boy pixels to RGB565 format and sends them to the display.
+ * Each pixel is duplicated horizontally and vertically to scale the 160x144 Game Boy
+ * screen to 320x288 pixels on the physical display.
+ * 
+ * @param gb Pointer to the Game Boy emulator context
+ * @param pixels Array of pixels for the current line
+ * @param line Line number to draw
+ */
 void lcd_draw_line(struct gb_s *gb, const uint8_t pixels[LCD_WIDTH],
-                   const uint_fast8_t line)
-{
-#if PEANUT_FULL_GBC_SUPPORT
-    if (gb->cgb.cgbMode)
-    {
-        for (unsigned int x = 0; x < LCD_WIDTH; x++)
-        {
-            // Convert RGB555 to RGB565 properly
-            uint16_t color555 = gb->cgb.fixPalette[pixels[x]];
-            uint16_t r = (color555 >> 10) & 0x1F;
-            uint16_t g = (color555 >> 5) & 0x1F;
-            uint16_t b = color555 & 0x1F;
-            uint16_t color565 = (r << 11) | ((g << 1) << 5) | b;
-            // Store in big-endian byte order (high byte first)
-            pixels_buffer[x * 2] = (uint8_t)(color565 >> 8);       // high byte
-            pixels_buffer[x * 2 + 1] = (uint8_t)(color565 & 0xFF); // low byte
-        }
-    }
-    else
-    {
-#endif
-        for (unsigned int x = 0; x < LCD_WIDTH; x++)
-        {
-            uint16_t color = palette[(pixels[x] & LCD_PALETTE_ALL) >> 4][pixels[x] & 3];
-            // Store in big-endian byte order (high byte first)
-            pixels_buffer[x * 2] = (uint8_t)(color >> 8);       // high byte
-            pixels_buffer[x * 2 + 1] = (uint8_t)(color & 0xFF); // low byte
-        }
-#if PEANUT_FULL_GBC_SUPPORT
-    }
-#endif
-
-    finish_write_data(false);
-    if (line == 0)
-    {
-        start_window((WIDTH - LCD_WIDTH) / 2, ((HEIGHT - LCD_HEIGHT) / 2), LCD_WIDTH, LCD_HEIGHT);
-    }
-    else if (line == LCD_HEIGHT)
-    {
-        finish_write_data(true);
-    }
-    else
-    {
-        write_data(pixels_buffer, LCD_WIDTH);
-    }
-}
-
-void lcd_draw_line_bis(struct gb_s *gb, const uint8_t pixels[LCD_WIDTH],
                        const uint_fast8_t line)
 {
     // Duplicate each pixel horizontally (160 -> 320 pixels)
@@ -351,7 +456,12 @@ void lcd_draw_line_bis(struct gb_s *gb, const uint8_t pixels[LCD_WIDTH],
 
 #if ENABLE_SDCARD
 /**
- * Load a save file from the SD card
+ * Load Save File
+ * 
+ * Loads a save file (cartridge RAM) from the SD card.
+ * The filename is derived from the ROM name.
+ * 
+ * @param gb Pointer to the Game Boy emulator context
  */
 void read_cart_ram_file(struct gb_s *gb)
 {
@@ -397,7 +507,12 @@ void read_cart_ram_file(struct gb_s *gb)
 }
 
 /**
- * Write a save file to the SD card
+ * Save Game Data
+ * 
+ * Writes the cartridge RAM to a save file on the SD card.
+ * The filename is derived from the ROM name.
+ * 
+ * @param gb Pointer to the Game Boy emulator context
  */
 void write_cart_ram_file(struct gb_s *gb)
 {
@@ -441,8 +556,12 @@ void write_cart_ram_file(struct gb_s *gb)
 }
 
 /**
- * Read a save file with internal GB enumalor state from the SD card.
- * This state will allow to resume game from the last run.
+ * Load Emulator State
+ * 
+ * Reads the internal Game Boy emulator state from the SD card.
+ * This allows resuming the game from where it was last played.
+ * 
+ * @param gb Pointer to the Game Boy emulator context
  */
 void read_gb_emulator_state(struct gb_s *gb)
 {
@@ -481,8 +600,12 @@ finish:
 }
 
 /**
- * Write a save file with internal GB enumalor state to the SD card.
- * When loaded, this state will allow to resume game from the last run.
+ * Save Emulator State
+ * 
+ * Writes the internal Game Boy emulator state to the SD card.
+ * This allows resuming the game from this exact state later.
+ * 
+ * @param gb Pointer to the Game Boy emulator context
  */
 void write_gb_emulator_state(struct gb_s *gb)
 {
@@ -519,6 +642,16 @@ finish:
     f_unmount(sd->pcName);
 }
 
+/**
+ * Erase Flash Memory
+ * 
+ * Erases a section of flash memory at the specified address.
+ * This function supports both RP2040 and RP2350 chips.
+ * 
+ * @param address Address to erase (offset from start of flash)
+ * @param size_bytes Size of area to erase in bytes
+ * @return 0 on success, error code on failure
+ */
 int flash_erase(uintptr_t address, uint32_t size_bytes)
 {
 #if PICO_RP2040
@@ -547,6 +680,17 @@ int flash_erase(uintptr_t address, uint32_t size_bytes)
 #endif
 }
 
+/**
+ * Program Flash Memory
+ * 
+ * Writes data to flash memory at the specified address.
+ * This function supports both RP2040 and RP2350 chips.
+ * 
+ * @param address Address to write to (offset from start of flash)
+ * @param buf Buffer containing data to write
+ * @param size_bytes Size of data to write in bytes
+ * @return 0 on success, error code on failure
+ */
 int flash_program(uintptr_t address, const void *buf, uint32_t size_bytes)
 {
 #if PICO_RP2040
@@ -573,7 +717,12 @@ int flash_program(uintptr_t address, const void *buf, uint32_t size_bytes)
 }
 
 /**
- * Load a .gb rom file in flash from the SD card
+ * Load ROM File
+ * 
+ * Loads a Game Boy ROM file from the SD card into flash memory.
+ * This makes the ROM available for the emulator to run.
+ * 
+ * @param filename Name of the ROM file to load
  */
 void load_cart_rom_file(char *filename)
 {
@@ -646,7 +795,14 @@ void load_cart_rom_file(char *filename)
 }
 
 /**
- * Function used by the rom file selector to display one page of .gb rom files
+ * Display ROM Selection Page
+ * 
+ * Displays one page of Game Boy ROM files found on the SD card.
+ * Used by the ROM file selector interface.
+ * 
+ * @param filename Array to store found filenames
+ * @param num_page Page number to display (each page shows up to 22 files)
+ * @return Number of files found on the page
  */
 uint16_t rom_file_selector_display_page(char filename[22][256], uint16_t num_page)
 {
@@ -705,14 +861,17 @@ uint16_t rom_file_selector_display_page(char filename[22][256], uint16_t num_pag
         DBG_INFO("Game: %s\n", filename[ifile]);
         draw_string(20, ifile * 20, filename[ifile]);
     }
-    update_lcd();
+    
     return num_file;
 }
 
 /**
- * The ROM selector displays pages of up to 22 rom files
- * allowing the user to select which rom file to start
- * Copy your *.gb rom files to the root directory of the SD card
+ * ROM File Selector
+ * 
+ * Presents a user interface to select a Game Boy ROM file to play.
+ * Displays pages of up to 22 ROM files and allows navigation between them.
+ * ROM files (.gb) should be placed in the root directory of the SD card.
+ * The selected ROM will be loaded into flash memory for execution.
  */
 void rom_file_selector()
 {
@@ -735,7 +894,6 @@ void rom_file_selector()
     sprintf(buf, "%02d", selected + 1);
     draw_string(0, FRAME_BUFF_HEIGHT - 20, buf);
     draw_string(0, (selected % 22) * 20, "=>");
-    update_lcd();
 
     /* get user's input */
     bool up = true, down = true, left = true, right = true, a = true, b = true, select = true, start = true;
@@ -750,7 +908,6 @@ void rom_file_selector()
             rom_file_selector_display_page(filename, num_page);
             sprintf(buf, "Loading %s", filename[selected]);
             draw_string(0, FRAME_BUFF_HEIGHT - 20, buf);
-            update_lcd();
             sleep_ms(150);
 
             load_cart_rom_file(filename[selected]);
@@ -778,7 +935,6 @@ void rom_file_selector()
             sprintf(buf, "%02d", selected + 1);
             draw_string(0, FRAME_BUFF_HEIGHT - 20, buf);
             draw_string(0, (selected % 22) * 20, "=>");
-            update_lcd();
             sleep_ms(150);
             break;
 
@@ -793,7 +949,6 @@ void rom_file_selector()
             sprintf(buf, "%02d", selected + 1);
             draw_string(0, FRAME_BUFF_HEIGHT - 20, buf);
             draw_string(0, (selected % 22) * 20, "=>");
-            update_lcd();
             sleep_ms(150);
             break;
         }
@@ -809,6 +964,14 @@ void rom_file_selector()
 
 #if ENABLE_SOUND
 
+/**
+ * Core 1 Audio Processing Function
+ * 
+ * This function runs on core 1 and handles all audio processing.
+ * It initializes the audio hardware, processes audio samples from the
+ * Game Boy APU, and sends them to the I2S audio output.
+ * Communication with core 0 happens via a queue for commands.
+ */
 void core1_audio(void)
 {   
     flash_safe_execute_core_init();
@@ -860,40 +1023,51 @@ void core1_audio(void)
 }
 #endif
 
+/**
+ * Main Function
+ * 
+ * Entry point of the program. Initializes hardware, sets up the Game Boy
+ * emulator, and runs the main application loop.
+ * 
+ * @return Should never return (runs in an infinite loop)
+ */
 int main(void)
 {
-    static struct gb_s gb;
-    enum gb_init_error_e ret;
-    const int buf_words = (16 * 4) + 1; // maximum of 16 partitions, each with maximum of 4 words returned, plus 1
+    static struct gb_s gb;         // Game Boy emulator context
+    enum gb_init_error_e ret;      // Initialization error code
+    const int buf_words = (16 * 4) + 1; // Maximum of 16 partitions, each with maximum of 4 words returned, plus 1
     uint32_t *buffer = malloc(buf_words * 4);
 
-    /* Overclock to 300 MHZ. */
-    vreg_set_voltage(VREG_VOLTAGE_1_30);
-    sleep_ms(100);
-    set_sys_clock_khz(SYS_CLK_FREQ / 1000, true);
+    /* Initialize system hardware */
+    vreg_set_voltage(VREG_VOLTAGE_1_30);     // Set voltage for overclocking
+    sleep_ms(100);                           // Wait for voltage to stabilize
+    set_sys_clock_khz(SYS_CLK_FREQ / 1000, true); // Overclock to 300 MHz
     
-    stdio_init_all();
-    DBG_INIT();
-    DBG_INFO("INIT: ");
+    stdio_init_all();                        // Initialize standard I/O
+    DBG_INIT();                              // Initialize debug output
+    DBG_INFO("INIT: ");                      // Print initialization message
 
+    /* Initialize subsystems */
 #if ENABLE_SOUND
     audio_commands_e q_audio = AUDIO_CMD_IDLE;
-    queue_init(&call_queue, sizeof(audio_commands_e), 2);
-    multicore_launch_core1(core1_audio);
+    queue_init(&call_queue, sizeof(audio_commands_e), 1); // Initialize communication queue
+    multicore_launch_core1(core1_audio);                  // Start audio processing on core 1
 #endif
 
 #if ENABLE_LCD
-    init(SYS_CLK_FREQ);
-    start_game();
-    clear_screen_buff();
-    update_full_screen();
+    init(SYS_CLK_FREQ);     // Initialize display with system clock frequency
+    start_game();           // Initialize display for game rendering
 #endif
 
-    init_i2c_kbd(); // Init keyboard
-    device_init();  // Init device
+    init_i2c_kbd();         // Initialize I2C keyboard interface
+    device_init();          // Initialize PocketPico device hardware
 
     while (true)
     {
+
+#if ENABLE_LCD
+        clear_screen_buff();
+#endif
 
 #if ENABLE_SDCARD
         /* ROM File selector */
@@ -903,12 +1077,15 @@ int main(void)
 #if ENABLE_LCD
         set_spi_speed(SYS_CLK_FREQ / 4);
         clear_frame_buff();
-        update_lcd();
 #endif
-        /* Initialise GB context. */
-        memcpy(rom_bank0, rom, sizeof(rom_bank0));
-        ret = gb_init(&gb, &gb_rom_read, &gb_cart_ram_read,
-                      &gb_cart_ram_write, &gb_error, NULL);
+        /* Initialize Game Boy emulator */
+        memcpy(rom_bank0, rom, sizeof(rom_bank0));  // Copy ROM bank 0 to RAM for faster access
+        ret = gb_init(&gb,                          // Initialize Game Boy context
+                     &gb_rom_read,                  // ROM read callback
+                     &gb_cart_ram_read,             // RAM read callback
+                     &gb_cart_ram_write,            // RAM write callback
+                     &gb_error,                     // Error handling callback
+                     NULL);                         // No custom context
         DBG_INFO("GB ");
 
         if (ret != GB_INIT_NO_ERROR)
@@ -918,22 +1095,19 @@ int main(void)
         }
 
 #if ENABLE_SDCARD
-        /* Try to load last saved emulator state for this game. */
-        read_gb_emulator_state(&gb);
+        /* Load saved emulator state */
+        read_gb_emulator_state(&gb);         // Try to load last saved emulator state
 #endif
 
-        /* Automatically assign a colour palette to the game */
+        /* Set up display colors */
         char rom_title[16];
-        auto_assign_palette(palette, gb_colour_hash(&gb), gb_get_rom_name(&gb, rom_title));
+        auto_assign_palette(palette,         // Automatically assign a color palette
+                           gb_colour_hash(&gb), 
+                           gb_get_rom_name(&gb, rom_title));
 
 #if ENABLE_LCD
-        gb_init_lcd(&gb, &lcd_draw_line_bis);
+        gb_init_lcd(&gb, &lcd_draw_line);    // Initialize LCD with draw line callback
         DBG_INFO("LCD ");
-#endif
-
-#if ENABLE_SDCARD
-        /* Load Save File. */
-        read_cart_ram_file(&gb);
 #endif
 
         DBG_INFO("\n> ");
