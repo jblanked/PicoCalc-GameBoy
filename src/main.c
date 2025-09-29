@@ -319,7 +319,7 @@ void draw_string(int x, int y, const char *str)
     while ((c = *(str++)) != '\0') {
         if (curr_x + 8 > FRAME_BUFF_WIDTH) break;
         draw_char_direct_rgb565(curr_x, y, c, color);
-        curr_x += 8 + 1; // 8 pixels de large + 1 pixel d'espacement
+        curr_x += 8 + 1; // 8 pixels width + 1 space pixel
     }
 }
 
