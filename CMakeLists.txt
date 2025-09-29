@@ -32,7 +32,6 @@ add_subdirectory(ext/PicoAudio)
 add_executable(PocketPico
         src/main.c
         ext/minigb_apu/minigb_apu.c
-        #ext/i2s/i2s.c
 )
 
 target_include_directories(PocketPico PRIVATE inc ext/hedley ext/peanut-gb ext/minigb_apu)
