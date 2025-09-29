@@ -302,28 +302,6 @@ void draw_char_direct_rgb565(int x0, int y0, const char c, uint16_t color)
 }
 
 /**
- * Direct String Rendering
- * 
- * Draws a string of characters directly on the screen without using an intermediate buffer.
- * 
- * @param x0 X-coordinate (relative to frame buffer)
- * @param y0 Y-coordinate (relative to frame buffer)
- * @param str String to draw
- * @param color Color of the text in RGB565 format
- */
-void draw_string_direct_rgb565(int x0, int y0, const char *str, uint16_t color)
-{
-    char c;
-    int curr_x = x0;
-    
-    while ((c = *(str++)) != '\0') {
-        if (curr_x + 8 > FRAME_BUFF_WIDTH) break; // Ne pas dépasser la largeur du buffer
-        draw_char_direct_rgb565(curr_x, y0, c, color);
-        curr_x += 8 + 1; // 8 pixels de large + 1 pixel d'espacement
-    }
-}
-
-/**
  * Draw String Helper Function
  * 
  * Wrapper function to draw a white string at the specified position.
@@ -334,7 +312,15 @@ void draw_string_direct_rgb565(int x0, int y0, const char *str, uint16_t color)
  */
 void draw_string(int x, int y, const char *str)
 {
-    draw_string_direct_rgb565(x, y, str, 0xffff);
+    char c;
+    int curr_x = x;
+    uint16_t color = 0xffff; // White color
+
+    while ((c = *(str++)) != '\0') {
+        if (curr_x + 8 > FRAME_BUFF_WIDTH) break;
+        draw_char_direct_rgb565(curr_x, y, c, color);
+        curr_x += 8 + 1; // 8 pixels de large + 1 pixel d'espacement
+    }
 }
 
 /**
