@@ -30,7 +30,13 @@
 #define PEANUT_GB_HIGH_LCD_ACCURACY 1 // Use high accuracy LCD emulation
 #define PEANUT_GB_USE_BIOS 0          // Don't use GB BIOS (use built-in boot code)
 #define PEANUT_FULL_GBC_SUPPORT 0     // Disable full Game Boy Color support
-#define SYS_CLK_FREQ 300 * MHZ        // Set system clock to 300 MHz
+#if PICO_RP2040
+    #define VREG_VOLT VREG_VOLTAGE_1_15
+    #define SYS_CLK_FREQ 266 * MHZ        // Set system clock to 300 MHz
+#elif PICO_RP2350
+    #define VREG_VOLT VREG_VOLTAGE_1_30
+    #define SYS_CLK_FREQ 300 * MHZ        // Set system clock to 300 MHz
+#endif
 
 #define ENABLE_DEBUG 1                // Enable debug output
 
@@ -935,7 +941,9 @@ void rom_file_selector()
  */
 void core1_audio(void)
 {   
+#if PICO_RP2350
     flash_safe_execute_core_init();
+#endif
 
     /* Allocate memory for the stream buffer */
     stream = malloc(AUDIO_SAMPLES_TOTAL * sizeof(int16_t));
@@ -1000,9 +1008,9 @@ int main(void)
     uint32_t *buffer = malloc(buf_words * 4);
 
     /* Initialize system hardware */
-    vreg_set_voltage(VREG_VOLTAGE_1_30);     // Set voltage for overclocking
+    vreg_set_voltage(VREG_VOLT);     // Set voltage for overclocking
     sleep_ms(100);                           // Wait for voltage to stabilize
-    set_sys_clock_khz(SYS_CLK_FREQ / 1000, true); // Overclock to 300 MHz
+    set_sys_clock_khz(SYS_CLK_FREQ / 1000, true); // Overclock 
     
     stdio_init_all();                        // Initialize standard I/O
     DBG_INIT();                              // Initialize debug output
