@@ -1008,8 +1008,8 @@ int main(void)
     uint32_t *buffer = malloc(buf_words * 4);
 
     /* Initialize system hardware */
-    vreg_set_voltage(VREG_VOLT);     // Set voltage for overclocking
-    sleep_ms(100);                           // Wait for voltage to stabilize
+    vreg_set_voltage(VREG_VOLT);                  // Set voltage for overclocking
+    sleep_ms(100);                                // Wait for voltage to stabilize
     set_sys_clock_khz(SYS_CLK_FREQ / 1000, true); // Overclock 
     
     stdio_init_all();                        // Initialize standard I/O
