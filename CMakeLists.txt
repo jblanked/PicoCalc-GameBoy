@@ -4,9 +4,9 @@ if(WIN32)
 else()
     set(USERHOME $ENV{HOME})
 endif()
-set(sdkVersion 2.1.1)
+set(sdkVersion 2.2.0)
 set(toolchainVersion 14_2_Rel1)
-set(picotoolVersion 2.1.1)
+set(picotoolVersion 2.2.0)
 set(picoVscode ${USERHOME}/.pico-sdk/cmake/pico-vscode.cmake)
 if (EXISTS ${picoVscode})
     include(${picoVscode})
@@ -14,8 +14,8 @@ endif()
 # ====================================================================================
 cmake_minimum_required(VERSION 3.13...3.23)
 
-set(PICO_PLATFORM rp2350)
-set(PICO_BOARD pico2 CACHE STRING "Board type")
+set(PICO_PLATFORM rp2040)
+set(PICO_BOARD pico CACHE STRING "Board type")
 
 include(pico_sdk_import.cmake)
 
@@ -26,24 +26,19 @@ set(CMAKE_CXX_STANDARD 17)
 pico_sdk_init()
 
 add_subdirectory(ext/FatFs_SPI build)
-#add_subdirectory(ext/ili9488)
 add_subdirectory(ext/ili9488_p)
 add_subdirectory(ext/PicoAudio)
 
 add_executable(PocketPico
         src/main.c
         ext/minigb_apu/minigb_apu.c
-        #ext/i2s/i2s.c
 )
 
-#pico_generate_pio_header(PocketPico ${CMAKE_CURRENT_LIST_DIR}/ext/i2s/audio_i2s.pio)
-
-#target_include_directories(PocketPico PRIVATE inc ext/hedley ext/peanut-gb ext/minigb_apu ext/i2s)
 target_include_directories(PocketPico PRIVATE inc ext/hedley ext/peanut-gb ext/minigb_apu)
 
 target_link_libraries(PocketPico
         FatFs_SPI
-        pico_stdlib pico_stdio pico_bootrom pico_multicore pico_multicore
+        pico_stdlib pico_stdio pico_bootrom pico_multicore
         hardware_clocks hardware_pio hardware_vreg hardware_pio hardware_flash
         hardware_sync hardware_pll hardware_spi hardware_irq hardware_dma
         pico_binary_info ili9488_p audio)
@@ -71,4 +66,4 @@ pico_enable_stdio_uart(PocketPico 0)
 pico_add_verbose_dis_output(PocketPico)
 pico_add_bin_output(PocketPico)
 pico_add_uf2_output(PocketPico)
-#pico_set_linker_script(PocketPico ${CMAKE_SOURCE_DIR}/memmap_default.ld)
+target_link_options(PocketPico PRIVATE -Wl,--print-memory-usage)
