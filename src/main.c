@@ -22,40 +22,7 @@
  * and audio playback using the Peanut-GB emulator core.
  */
 
-// Peanut-GB emulator settings
-/* Core emulator feature configuration */
-#define ENABLE_LCD 1                  // Enable LCD display output
-#define ENABLE_SOUND 1                // Enable sound output
-#define ENABLE_SDCARD 1               // Enable SD card for ROM and save storage
-#define PEANUT_GB_HIGH_LCD_ACCURACY 1 // Use high accuracy LCD emulation
-#define PEANUT_GB_USE_BIOS 0          // Don't use GB BIOS (use built-in boot code)
-#define PEANUT_FULL_GBC_SUPPORT 0     // Disable full Game Boy Color support
-#if PICO_RP2040
-    #define VREG_VOLT VREG_VOLTAGE_1_15
-    #define SYS_CLK_FREQ 266 * MHZ        // Set system clock to 266 MHz
-#elif PICO_RP2350
-    #define VREG_VOLT VREG_VOLTAGE_1_30
-    #define SYS_CLK_FREQ 300 * MHZ        // Set system clock to 300 MHz
-#endif
-
-#define ENABLE_DEBUG 1                // Enable debug output
-
-/* Display hardware configuration */
-#define USE_ILI9225 0                 // Disable ILI9225 display driver
-#define USE_ILI9488 1                 // Enable ILI9488 display driver
-
-/**
- * VSYNC Timing Configuration
- * 
- * Reduces VSYNC calculation to a lower multiple for better performance.
- * When setting a clock IRQ to DMG_CLOCK_FREQ_REDUCED, count to
- * SCREEN_REFRESH_CYCLES_REDUCED to obtain the time required for each VSYNC.
- * DMG_CLOCK_FREQ_REDUCED = 2^18, and SCREEN_REFRESH_CYCLES_REDUCED = 4389.
- * Currently unused.
- */
-#define VSYNC_REDUCTION_FACTOR 16u
-#define SCREEN_REFRESH_CYCLES_REDUCED (SCREEN_REFRESH_CYCLES / VSYNC_REDUCTION_FACTOR)
-#define DMG_CLOCK_FREQ_REDUCED (DMG_CLOCK_FREQ / VSYNC_REDUCTION_FACTOR)
+ #include "config.h"
 
 /* Standard C Headers */
 #include <stdlib.h>
@@ -123,14 +90,6 @@ queue_t call_queue;            // Queue for communication between cores
 int16_t *stream;
 struct minigb_apu_ctx apu_ctx = {0};
 
-/* Audio Hardware Configuration */
-#define AUDIO_DATA_PIN 26      // I2S data pin
-#define AUDIO_CLOCK_PIN 27     // I2S clock pin
-#define AUDIO_PWM_PIN 26       // PWM output pin (same as data pin)
-#define PIN_SPEAKER 26         // Speaker connection pin
-#define SPK_LATENCY 256        // Audio buffer latency
-#define SPK_PWM_FREQ 22050     // PWM frequency for audio output
-
 #include "audio.h"
 #include "peanut_gb.h"
 #undef audio_read
@@ -173,11 +132,6 @@ static struct
     unsigned up : 1;       // Up direction
     unsigned down : 1;     // Down direction
 } prev_joypad_bits;
-
-/* Display Buffer Configuration */
-#define FRAME_BUFF_WIDTH 320                  // Width of frame buffer
-#define FRAME_BUFF_STRIDE (FRAME_BUFF_WIDTH * 2) // Stride of frame buffer (bytes per row)
-#define FRAME_BUFF_HEIGHT 320                 // Height of frame buffer
 
 /* Line buffer for rendering Game Boy LCD output */
 static uint8_t pixels_buffer[WIDTH*2] = {0};
