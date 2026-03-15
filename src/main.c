@@ -32,7 +32,7 @@
 #define PEANUT_FULL_GBC_SUPPORT 0     // Disable full Game Boy Color support
 #if PICO_RP2040
     #define VREG_VOLT VREG_VOLTAGE_1_15
-    #define SYS_CLK_FREQ 266 * MHZ        // Set system clock to 300 MHz
+    #define SYS_CLK_FREQ 266 * MHZ        // Set system clock to 266 MHz
 #elif PICO_RP2350
     #define VREG_VOLT VREG_VOLTAGE_1_30
     #define SYS_CLK_FREQ 300 * MHZ        // Set system clock to 300 MHz
