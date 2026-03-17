@@ -1,8 +1,7 @@
 #pragma once
 
 // Peanut-GB emulator settings
-#define ENABLE_DEBUG 1                // Enable debug output
-#define ENABLE_LCD 1                  // Enable LCD display output
+#define ENABLE_DEBUG 0                // Enable debug output
 #define ENABLE_SOUND 1                // Enable sound output
 #define ENABLE_SDCARD 1               // Enable SD card for ROM and save storage
 #define PEANUT_GB_HIGH_LCD_ACCURACY 1 // Use high accuracy LCD emulation
@@ -30,9 +29,8 @@
 #define FRAME_BUFF_HEIGHT 320 // Height of frame buffer
 
 // lcd methods
-#if ENABLE_LCD
 #define LCD_INCLUDE "picocalc.h"
-#define LCD_STRING lcd_string // (uint16_t x, uint16_t y, const char *str, uint16_t color)
-#define LCD_CLEAR lcd_clear   // (void)
-#define LCD_BLIT lcd_blit     // (const uint8_t *pixels, uint16_t line)
-#endif
+#define LCD_INIT picocalc_init // (void)
+#define LCD_STRING lcd_string  // (uint16_t x, uint16_t y, const char *str, uint16_t color)
+#define LCD_CLEAR lcd_clear    // (void)
+#define LCD_BLIT lcd_blit      // (const uint8_t *pixels, uint16_t line)

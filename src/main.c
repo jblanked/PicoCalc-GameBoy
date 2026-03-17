@@ -40,26 +40,8 @@
 #include "peanut_gb.h"
 #endif
 
-/* Standard C Headers */
-#include <stdlib.h>
-#include <string.h>
-
-/* Raspberry Pi Pico SDK Headers */
-#include <hardware/pio.h>
-#include <hardware/clocks.h>
-#include <hardware/dma.h>
-#include <hardware/spi.h>
-#include <hardware/sync.h>
-#include <hardware/timer.h>
 #include <hardware/vreg.h>
-#include <pico/bootrom.h>
-#include <pico/stdlib.h>
 #include <pico/multicore.h>
-#include <sys/unistd.h>
-#include <hardware/irq.h>
-
-#include "boot/picobin.h"
-#include "hardware/watchdog.h"
 
 struct minigb_apu_ctx apu_ctx = {0}; // Game Boy APU context
 const uint8_t *rom = (const uint8_t *)(XIP_BASE + FLASH_TARGET_OFFSET);
@@ -87,8 +69,6 @@ static struct
     unsigned up : 1;     // Up direction
     unsigned down : 1;   // Down direction
 } prev_joypad_bits;
-
-#if ENABLE_LCD
 
 /**
  * LCD Draw Line Callback
@@ -140,9 +120,10 @@ void lcd_draw_line(struct gb_s *gb, const uint8_t pixels[LCD_WIDTH],
     }
 #endif
 
+#ifdef LCD_BLIT
     LCD_BLIT(pixels_buffer, line, LCD_WIDTH, LCD_HEIGHT);
-}
 #endif
+}
 
 /**
  * Main Function
@@ -175,13 +156,9 @@ int main(void)
     multicore_launch_core1(audio_process);                // Start audio processing on core 1
 #endif
 
-#if ENABLE_LCD
-    init(SYS_CLK_FREQ); // Initialize display with system clock frequency
-    start_game();       // Initialize display for game rendering
+#ifdef LCD_INIT
+    LCD_INIT(); // Initialize LCD display
 #endif
-
-    init_i2c_kbd(); // Initialize I2C keyboard interface
-    device_init();  // Initialize PocketPico device hardware
 
     while (true)
     {
@@ -190,12 +167,11 @@ int main(void)
         rom_file_selector();
 #endif
 
-#if ENABLE_LCD
         set_spi_speed(SYS_CLK_FREQ / 4);
 #ifdef LCD_CLEAR
         LCD_CLEAR();
 #endif
-#endif
+
         /* Initialize Game Boy emulator */
         memcpy(rom_bank0, rom, sizeof(rom_bank0)); // Copy ROM bank 0 to RAM for faster access
         ret = gb_init(&gb,                         // Initialize Game Boy context
@@ -223,11 +199,8 @@ int main(void)
                             gb_colour_hash(&gb),
                             gb_get_rom_name(&gb, rom_title));
 
-#if ENABLE_LCD
         gb_init_lcd(&gb, &lcd_draw_line); // Initialize LCD with draw line callback
         DBG_INFO("LCD ");
-#endif
-
         DBG_INFO("\n> ");
         uint_fast32_t frames = 0;
         uint64_t start_time = time_us_64();
