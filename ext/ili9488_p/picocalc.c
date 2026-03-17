@@ -645,3 +645,16 @@ void lcd_blit(const uint8_t *pixels, uint_fast8_t line, int gb_width, int gb_hei
         write_data((uint8_t *)pixels, gb_width * 2);
     }
 }
+
+void picocalc_init()
+{
+#if PICO_RP2040
+    init(266 * MHZ); // Initialize display with system clock frequency
+#elif PICO_RP2350
+    init(300 * MHZ); // Initialize display with system clock frequency
+#endif
+
+    start_game();   // Initialize display for game rendering
+    init_i2c_kbd(); // Initialize I2C keyboard interface
+    device_init();  // Initialize PocketPico device hardware
+}

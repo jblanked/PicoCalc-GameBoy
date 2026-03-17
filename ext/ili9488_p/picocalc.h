@@ -79,9 +79,6 @@ void lcd_blit(const uint8_t *pixels, uint_fast8_t line, int gb_width, int gb_hei
 // write LCD command
 void write_command(uint8_t cmd, const uint8_t *data, int len);
 
-// write LCD command
-// void write_command(uint8_t cmd);
-
 // SPI write
 void write_blocking(const uint8_t *data, int len);
 
@@ -93,6 +90,7 @@ void set_kdb_key(uint8_t pin_offset, uint8_t key_status);
 void device_init();
 int wait_key();
 
+void picocalc_init();
 void lcd_char(uint16_t x, uint16_t y, char c, uint16_t color);
 void lcd_string(uint16_t x, uint16_t y, const char *str, uint16_t color);
 void lcd_clear(void);
