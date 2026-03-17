@@ -30,3 +30,12 @@ size_t sd_get_num(void);
 sd_card_t *sd_get_by_num(size_t num);
 size_t spi_get_num(void);
 spi_t *spi_get_by_num(size_t num);
+
+size_t file_read(const char *filename, uint8_t *buffer, size_t buffer_size);
+size_t file_size(const char *filename);
+bool file_write(const char *filename, const uint8_t *buffer, size_t buffer_size);
+size_t file_read_chunk(const char *filename, uint8_t *buffer, size_t buffer_size, size_t offset);
+uint16_t file_list(const char *pattern, char filenames[][256], uint16_t skip, uint16_t max_count);
+void *file_open(const char *filename);
+void file_close(void *handle);
+size_t file_read_file_chunk(void *handle, uint8_t *buffer, size_t buffer_size);

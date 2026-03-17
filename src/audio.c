@@ -1,13 +1,15 @@
 #include "audio.h"
 #include "shared.h"
-#include "hedley.h"
+#ifdef ENABLE_SOUND
 #include "../ext/PicoAudio/audio.h"
+#endif
 
 queue_t call_queue;
 int16_t *stream;
 
 void audio_process(void)
 {
+#ifdef ENABLE_SOUND
 #if PICO_RP2350
     flash_safe_execute_core_init();
 #endif
@@ -55,5 +57,6 @@ void audio_process(void)
     }
 
     DBG_INFO("I Audio stop on core1.\n");
-    HEDLEY_UNREACHABLE();
+    free(stream);
+#endif
 }

@@ -1,9 +1,7 @@
 #include "rom.h"
-#include "sdcard.h"
 #include "shared.h"
+#include SD_INCLUDE
 #include "flash.h"
-
-#include "config.h"
 #include LCD_INCLUDE
 
 /**
@@ -16,72 +14,67 @@
  */
 void load_cart_rom_file(char *filename)
 {
-    UINT br;
     uint8_t buffer[FLASH_SECTOR_SIZE];
     bool mismatch = false;
-    sd_card_t *pSD = sd_get_by_num(0);
-    FRESULT fr = f_mount(&pSD->fatfs, pSD->pcName, 1);
-    if (FR_OK != fr)
+
+    size_t total_size = SD_FILE_SIZE(filename);
+    if (total_size == 0)
     {
-        DBG_INFO("E f_mount error: %s (%d)\n", FRESULT_str(fr), fr);
+        DBG_INFO("E load_cart_rom_file: could not get size for %s\n", filename);
         return;
     }
-    FIL fil;
-    fr = f_open(&fil, filename, FA_READ);
-    if (fr == FR_OK)
+
+    void *fh = SD_FILE_OPEN(filename);
+    if (!fh)
     {
-        uint32_t flash_target_offset = FLASH_TARGET_OFFSET;
-        uint32_t ctl_flash = 0;
-        for (;;)
+        DBG_INFO("E load_cart_rom_file: could not open %s\n", filename);
+        return;
+    }
+
+    uint32_t flash_target_offset = FLASH_TARGET_OFFSET;
+    size_t file_offset = 0;
+
+    while (file_offset < total_size)
+    {
+        memset(buffer, 0xFF, sizeof buffer);
+        size_t br = SD_FILE_READ_FILE_CHUNK(fh, buffer, sizeof buffer);
+        if (br == 0)
+            break;
+
+        DBG_INFO("I Erasing target region...\n");
+        flash_erase(flash_target_offset, FLASH_SECTOR_SIZE);
+        DBG_INFO("I Programming target region...\n");
+        flash_program(flash_target_offset, buffer, FLASH_SECTOR_SIZE);
+
+        /* Read back target region and check programming */
+        DBG_INFO("I Done. Reading back target region...\n");
+        for (uint32_t i = 0; i < FLASH_SECTOR_SIZE; i++)
         {
-            f_read(&fil, buffer, sizeof buffer, &br);
-            if (br == 0)
-                break; /* end of file */
-
-            DBG_INFO("I Erasing target region...\n");
-            flash_erase(flash_target_offset, FLASH_SECTOR_SIZE);
-            DBG_INFO("I Programming target region...\n");
-            flash_program(flash_target_offset, buffer, FLASH_SECTOR_SIZE);
-
-            /* Read back target region and check programming */
-            DBG_INFO("I Done. Reading back target region...\n");
-            for (uint32_t i = 0; i < FLASH_SECTOR_SIZE; i++)
+            if (rom[file_offset + i] != buffer[i])
             {
-                if (rom[ctl_flash + i] != buffer[i])
-                {
-                    DBG_INFO("E Mismatch at address 0x%08X: read 0x%02X, expected 0x%02X\n",
-                             (unsigned)(flash_target_offset + i),
-                             rom[ctl_flash + i], buffer[i]);
-                    mismatch = true;
-                }
+                DBG_INFO("E Mismatch at address 0x%08X: read 0x%02X, expected 0x%02X\n",
+                         (unsigned)(flash_target_offset + i),
+                         rom[file_offset + i], buffer[i]);
+                mismatch = true;
             }
+        }
 
-            /* Next sector */
-            ctl_flash += FLASH_SECTOR_SIZE;
-            flash_target_offset += FLASH_SECTOR_SIZE;
-        }
-        if (!mismatch)
-        {
-            DBG_INFO("I Programming successful!\n");
-        }
-        else
-        {
-            DBG_INFO("E Programming failed!\n");
-        }
+        file_offset += br;
+        flash_target_offset += FLASH_SECTOR_SIZE;
+    }
+
+    SD_FILE_CLOSE(fh);
+
+    if (!mismatch)
+    {
+        DBG_INFO("I Programming successful!\n");
     }
     else
     {
-        DBG_INFO("E f_open(%s) error: %s (%d)\n", filename, FRESULT_str(fr), fr);
+        DBG_INFO("E Programming failed!\n");
     }
 
-    fr = f_close(&fil);
-    if (fr != FR_OK)
-    {
-        DBG_INFO("E f_close error: %s (%d)\n", FRESULT_str(fr), fr);
-    }
-    f_unmount(pSD->pcName);
-
-    DBG_INFO("I load_cart_rom_file(%s) COMPLETE (%lu bytes)\n", filename, br);
+    DBG_INFO("I load_cart_rom_file(%s) COMPLETE (%zu bytes)\n", filename, total_size);
 }
 
 /**
@@ -96,53 +89,13 @@ void load_cart_rom_file(char *filename)
  */
 uint16_t rom_file_selector_display_page(char filename[22][256], uint16_t num_page)
 {
-    sd_card_t *pSD = sd_get_by_num(0);
-    DIR dj;
-    FILINFO fno;
-    FRESULT fr;
-
-    fr = f_mount(&pSD->fatfs, pSD->pcName, 1);
-    if (FR_OK != fr)
-    {
-        DBG_INFO("E f_mount error: %s (%d)\n", FRESULT_str(fr), fr);
-        return 0;
-    }
-
     /* clear the filenames array */
     for (uint8_t ifile = 0; ifile < 22; ifile++)
     {
         strcpy(filename[ifile], "");
     }
 
-    /* search *.gb files */
-    uint16_t num_file = 0;
-    fr = f_findfirst(&dj, &fno, ".", "?*.gb");
-
-    /* skip the first N pages */
-    if (num_page > 0)
-    {
-        while (num_file < num_page * 22 && fr == FR_OK && fno.fname[0])
-        {
-            num_file++;
-            fr = f_findnext(&dj, &fno);
-        }
-    }
-
-    /* store the filenames of this page */
-    num_file = 0;
-    while (num_file < 22 && fr == FR_OK && fno.fname[0])
-    {
-        if (fno.fname[0] != '.')
-        {
-            /* Skip any file starting with dot. These are hidden files. */
-            strcpy(filename[num_file], fno.fname);
-            num_file++;
-        }
-
-        fr = f_findnext(&dj, &fno);
-    }
-    f_closedir(&dj);
-    f_unmount(pSD->pcName);
+    uint16_t num_file = SD_FILE_LIST("?*.gb", filename, num_page * 22, 22);
 
 /* display *.gb rom files on screen */
 #ifdef LCD_CLEAR
