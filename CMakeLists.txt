@@ -14,7 +14,7 @@ endif()
 # ====================================================================================
 cmake_minimum_required(VERSION 3.13...3.23)
 
-set(PICO_PLATFORM rp2040)
+set(PICO_PLATFORM rp2040 CACHE STRING "Platform type")
 set(PICO_BOARD pico CACHE STRING "Board type")
 
 include(pico_sdk_import.cmake)
@@ -30,8 +30,14 @@ add_subdirectory(ext/ili9488_p)
 add_subdirectory(ext/PicoAudio)
 
 add_executable(PocketPico
+        src/audio.c 
+        src/flash.c 
+        src/gb.c
         src/main.c
-        src/flash.c
+        src/ram_cart.c
+        src/rom.c
+        src/sdcard.c
+        src/state.c
         ext/minigb_apu/minigb_apu.c
 )
 
