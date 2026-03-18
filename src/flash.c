@@ -1,9 +1,19 @@
 #include "flash.h"
+#include "config.h"
+#if PICO_RP2040
+#include <pico/multicore.h>
+#endif
 
 int flash_erase(uintptr_t address, uint32_t size_bytes)
 {
 #if PICO_RP2040
+#if ENABLE_SOUND
+    multicore_lockout_start_blocking(); // Pause core 1 (running from flash) during erase
+#endif
     flash_range_erase(address, size_bytes);
+#if ENABLE_SOUND
+    multicore_lockout_end_blocking();
+#endif
     return 0;
 #elif PICO_RP2350
     cflash_flags_t cflash_flags = {(CFLASH_OP_VALUE_ERASE << CFLASH_OP_LSB) |
@@ -32,7 +42,13 @@ int flash_erase(uintptr_t address, uint32_t size_bytes)
 int flash_program(uintptr_t address, const void *buf, uint32_t size_bytes)
 {
 #if PICO_RP2040
+#if ENABLE_SOUND
+    multicore_lockout_start_blocking(); // Pause core 1 (running from flash) during programming
+#endif
     flash_range_program(address, buf, size_bytes);
+#if ENABLE_SOUND
+    multicore_lockout_end_blocking();
+#endif
     return 0;
 
 #elif PICO_RP2350
