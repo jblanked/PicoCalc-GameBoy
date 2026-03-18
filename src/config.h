@@ -16,6 +16,20 @@
 #define SYS_CLK_FREQ 300 * MHZ
 #endif
 
+// ROM storage backend (flash by default; swap macros for PSRAM or other memory)
+// ROM_STORAGE_WRITE_CHUNK(offset, buf, size) - offset is bytes from the start of
+// the storage region (0 = first byte of ROM area), not an absolute address.
+#define ROM_STORAGE_INCLUDE "flash.h"
+#define ROM_STORAGE_OFFSET (1024 * 1024)                                         // byte offset into the medium where ROM begins (1MB into flash)
+#define ROM_STORAGE_BASE_ADDR ((const uint8_t *)(XIP_BASE + ROM_STORAGE_OFFSET)) // base address for ROM reads
+#define ROM_STORAGE_CHUNK_SIZE 4096                                              // write granularity in bytes
+#define ROM_STORAGE_WRITE_CHUNK(offset, buf, size)                   \
+    do                                                               \
+    {                                                                \
+        flash_erase(ROM_STORAGE_OFFSET + (offset), (size));          \
+        flash_program(ROM_STORAGE_OFFSET + (offset), (buf), (size)); \
+    } while (0)
+
 // buffer settings
 #define BUFFER_RAM_SIZE 32768
 #define BUFFER_ROM_SIZE 1048576

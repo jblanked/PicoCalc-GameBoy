@@ -4,7 +4,7 @@
 
 static uint8_t ram[BUFFER_RAM_SIZE];                   // 32KB buffer for cartridge RAM
 static unsigned char rom_bank0[BUFFER_ROM_BANK0_SIZE]; // 32KB buffer for ROM bank 0 (cached in RAM for faster access)
-static const uint8_t *rom = (const uint8_t *)(XIP_BASE + FLASH_TARGET_OFFSET);
+static const uint8_t *rom = ROM_STORAGE_BASE_ADDR;
 
 void buffer_ram_init(void)
 {

@@ -1,7 +1,7 @@
 #include "rom.h"
 #include "shared.h"
 #include SD_INCLUDE
-#include "flash.h"
+#include ROM_STORAGE_INCLUDE
 #include LCD_INCLUDE
 #include BUFFER_INCLUDE
 
@@ -15,7 +15,7 @@
  */
 void load_cart_rom_file(char *filename)
 {
-    uint8_t buffer[FLASH_SECTOR_SIZE];
+    uint8_t buffer[ROM_STORAGE_CHUNK_SIZE];
     bool mismatch = false;
 
     size_t total_size = SD_FILE_SIZE(filename);
@@ -32,7 +32,6 @@ void load_cart_rom_file(char *filename)
         return;
     }
 
-    uint32_t flash_target_offset = FLASH_TARGET_OFFSET;
     size_t file_offset = 0;
 
     while (file_offset < total_size)
@@ -42,28 +41,25 @@ void load_cart_rom_file(char *filename)
         if (br == 0)
             break;
 
-        DBG_INFO("I Erasing target region...\n");
-        flash_erase(flash_target_offset, FLASH_SECTOR_SIZE);
-        DBG_INFO("I Programming target region...\n");
-        flash_program(flash_target_offset, buffer, FLASH_SECTOR_SIZE);
+        DBG_INFO("I Writing target region...\n");
+        ROM_STORAGE_WRITE_CHUNK(file_offset, buffer, ROM_STORAGE_CHUNK_SIZE);
 
         /* Read back target region and check programming */
         DBG_INFO("I Done. Reading back target region...\n");
         uint8_t rom_val;
-        for (uint32_t i = 0; i < FLASH_SECTOR_SIZE; i++)
+        for (uint32_t i = 0; i < ROM_STORAGE_CHUNK_SIZE; i++)
         {
             BUFFER_ROM_BUFFER_READ(file_offset + i, &rom_val, 1);
             if (rom_val != buffer[i])
             {
-                DBG_INFO("E Mismatch at address 0x%08X: read 0x%02X, expected 0x%02X\n",
-                         (unsigned)(flash_target_offset + i),
+                DBG_INFO("E Mismatch at offset 0x%08X: read 0x%02X, expected 0x%02X\n",
+                         (unsigned)(file_offset + i),
                          rom_val, buffer[i]);
                 mismatch = true;
             }
         }
 
         file_offset += br;
-        flash_target_offset += FLASH_SECTOR_SIZE;
     }
 
     SD_FILE_CLOSE(fh);
