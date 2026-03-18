@@ -31,9 +31,14 @@
     } while (0)
 
 // buffer settings
-#define BUFFER_RAM_SIZE 32768
 #define BUFFER_ROM_SIZE 1048576
-#define BUFFER_ROM_BANK0_SIZE 32768
+#if PICO_RP2040
+#define BUFFER_RAM_SIZE 1024 * 32
+#define BUFFER_ROM_BANK0_SIZE 1024 * 32
+#elif PICO_RP2350
+#define BUFFER_RAM_SIZE 1024 * 128
+#define BUFFER_ROM_BANK0_SIZE 1024 * 128
+#endif
 #define BUFFER_INCLUDE "buffer.h"
 #define BUFFER_RAM_INIT buffer_ram_init
 #define BUFFER_RAM_BUFFER_READ buffer_ram_buffer_read
