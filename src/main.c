@@ -164,14 +164,12 @@ int main(void)
     DBG_INFO("INIT: "); // Print initialization message
 
     /* Initialize subsystems */
-#if ENABLE_SOUND
-    audio_commands_e q_audio = AUDIO_CMD_IDLE;
-    queue_init(&call_queue, sizeof(audio_commands_e), 1); // Initialize communication queue
-    multicore_launch_core1(audio_process);                // Start audio processing on core 1
-#endif
-
 #ifdef LCD_INIT
     LCD_INIT(); // Initialize LCD display
+#endif
+
+#if ENABLE_SOUND
+    multicore_launch_core1(audio_process); // Start audio processing on core 1 (after LCD init)
 #endif
 
     while (true)
@@ -233,10 +231,7 @@ int main(void)
 
 #if ENABLE_SOUND
             if (!gb.direct.frame_skip)
-            {
-                q_audio = AUDIO_CMD_PLAYBACK;
-                queue_add_blocking(&call_queue, &q_audio);
-            }
+                multicore_fifo_push_blocking((uint32_t)AUDIO_CMD_PLAYBACK);
 #endif
             /* Update buttons state */
             prev_joypad_bits.up = gb.direct.joypad_bits.up;
@@ -261,17 +256,9 @@ int main(void)
             {
 #if ENABLE_SOUND
                 if (!gb.direct.joypad_bits.up && prev_joypad_bits.up)
-                {
-                    /* select + up: increase sound volume */
-                    q_audio = AUDIO_CMD_VOLUME_UP;
-                    queue_add_blocking(&call_queue, &q_audio);
-                }
+                    multicore_fifo_push_blocking((uint32_t)AUDIO_CMD_VOLUME_UP);
                 if (!gb.direct.joypad_bits.down && prev_joypad_bits.down)
-                {
-                    /* select + down: decrease sound volume */
-                    q_audio = AUDIO_CMD_VOLUME_DOWN;
-                    queue_add_blocking(&call_queue, &q_audio);
-                }
+                    multicore_fifo_push_blocking((uint32_t)AUDIO_CMD_VOLUME_DOWN);
 #endif
                 if (!gb.direct.joypad_bits.right && prev_joypad_bits.right)
                 {

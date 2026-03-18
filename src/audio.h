@@ -1,6 +1,5 @@
 #pragma once
 #include <stdint.h>
-#include "pico/util/queue.h"
 
 /**
  * Audio Command Enumeration
@@ -15,8 +14,6 @@ typedef enum
     AUDIO_CMD_VOLUME_DOWN, // Decrease volume
     AUDIO_CMD_INVALID      // Invalid command
 } audio_commands_e;
-
-extern queue_t call_queue; // Queue for communication between cores
 
 /**
  * Global Variables for Audio Processing

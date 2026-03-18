@@ -3,22 +3,14 @@
 #if ENABLE_SOUND
 #include "../ext/PicoAudio/audio.h"
 #endif
-#if PICO_RP2040
-#include <pico/multicore.h>
-#endif
 
-queue_t call_queue;
+#include <pico/multicore.h>
+
 int16_t *stream;
 
 void audio_process(void)
 {
 #if ENABLE_SOUND
-#if PICO_RP2350
-    flash_safe_execute_core_init();
-#elif PICO_RP2040
-    multicore_lockout_victim_init(); // Allow core 0 to safely lock us out during flash operations
-#endif
-
     /* Allocate memory for the stream buffer */
     stream = malloc(AUDIO_SAMPLES_TOTAL * sizeof(int16_t));
     assert(stream != NULL);
@@ -38,8 +30,7 @@ void audio_process(void)
 
     while (1)
     {
-        audio_commands_e cmd;
-        queue_remove_blocking(&call_queue, &cmd);
+        audio_commands_e cmd = (audio_commands_e)multicore_fifo_pop_blocking();
         switch (cmd)
         {
         case AUDIO_CMD_PLAYBACK:
