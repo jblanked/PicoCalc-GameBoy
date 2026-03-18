@@ -1,8 +1,10 @@
 #include "flash.h"
 #include "config.h"
-#if PICO_RP2040
+#include "debug.h"
+
 #include <pico/multicore.h>
-#endif
+#include <pico/bootrom.h>
+#include <pico/stdlib.h>
 
 int flash_erase(uintptr_t address, uint32_t size_bytes)
 {
