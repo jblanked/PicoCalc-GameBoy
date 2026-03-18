@@ -31,6 +31,7 @@ add_subdirectory(ext/PicoAudio)
 
 add_executable(PocketPico
         src/audio.c 
+        src/buffer.c 
         src/flash.c 
         src/gb.c
         src/main.c
