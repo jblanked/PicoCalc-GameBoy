@@ -43,7 +43,9 @@
 #include <hardware/vreg.h>
 #include <pico/multicore.h>
 
+#if ENABLE_SOUND
 struct minigb_apu_ctx apu_ctx = {0}; // Game Boy APU context
+#endif
 const uint8_t *rom = (const uint8_t *)(XIP_BASE + FLASH_TARGET_OFFSET);
 unsigned char rom_bank0[32768];         // 32KB buffer for ROM bank 0 (cached in RAM for faster access)
 uint8_t ram[32768];                     // 32KB buffer for cartridge RAM
@@ -191,6 +193,11 @@ int main(void)
 #if ENABLE_SDCARD
         /* Load saved emulator state */
         read_gb_emulator_state(&gb); // Try to load last saved emulator state
+        /* Restore function pointers overwritten by state load (addresses change between builds) */
+        gb.gb_rom_read = &gb_rom_read;
+        gb.gb_cart_ram_read = &gb_cart_ram_read;
+        gb.gb_cart_ram_write = &gb_cart_ram_write;
+        gb.gb_error = &gb_error;
 #endif
 
         /* Set up display colors */

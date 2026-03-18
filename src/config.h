@@ -17,12 +17,10 @@
 #endif
 
 /* Audio Hardware Configuration */
-#if ENABLE_SOUND
 #define AUDIO_DATA_PIN 26  // I2S data pin
 #define AUDIO_CLOCK_PIN 27 // I2S clock pin
 #define AUDIO_PWM_PIN 26   // PWM output pin (same as data pin)
 #define SPK_PWM_FREQ 22050 // PWM frequency for audio output
-#endif
 
 /* Display Buffer Configuration */
 #define FRAME_BUFF_WIDTH 320  // Width of frame buffer
