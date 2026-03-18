@@ -14,7 +14,7 @@ endif()
 # ====================================================================================
 cmake_minimum_required(VERSION 3.13...3.23)
 
-set(PICO_PLATFORM rp2040)
+set(PICO_PLATFORM rp2040 CACHE STRING "Platform type")
 set(PICO_BOARD pico CACHE STRING "Board type")
 
 include(pico_sdk_import.cmake)
@@ -30,11 +30,19 @@ add_subdirectory(ext/ili9488_p)
 add_subdirectory(ext/PicoAudio)
 
 add_executable(PocketPico
+        src/audio.c 
+        src/buffer.c 
+        src/flash.c 
+        src/gb.c
         src/main.c
+        src/ram_cart.c
+        src/rom.c
+        src/sdcard.c
+        src/state.c
         ext/minigb_apu/minigb_apu.c
 )
 
-target_include_directories(PocketPico PRIVATE inc ext/hedley ext/peanut-gb ext/minigb_apu)
+target_include_directories(PocketPico PRIVATE inc ext/peanut-gb ext/minigb_apu)
 
 target_link_libraries(PocketPico
         FatFs_SPI
@@ -46,6 +54,7 @@ target_link_libraries(PocketPico
 target_compile_definitions(PocketPico PRIVATE
         PARAM_ASSERTIONS_DISABLE_ALL=1
         PICO_ENTER_USB_BOOT_ON_EXIT=1
+        PICO_FLASH_ASSUME_CORE1_SAFE=1
         PICO_STDIO_ENABLE_CRLF_SUPPORT=0
         PICO_STDIO_DEFAULT_CRLF=0
         PICO_PRINTF_SUPPORT_FLOAT=0

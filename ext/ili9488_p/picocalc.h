@@ -6,6 +6,7 @@
 #include "hardware/gpio.h"
 #include "hardware/clocks.h"
 #include "hardware/dma.h"
+#include "mono8x16.h" // Font for text display
 
 #define WIDTH 320
 #define HEIGHT 320 // LCD SCREEN HEIGHT,not logical Height
@@ -37,15 +38,15 @@ typedef enum
 #define KEY_UP 4
 
 static const uint8_t KEYCHECKTIME = 16;
-static const uint TICKSPERSEC   = 1000;   /* Ticks per second */
-static const int PIN_PAD_A      = 0;
-static const int PIN_PAD_B      = 0;
-static const int PIN_PAD_START  = 0;
+static const uint TICKSPERSEC = 1000; /* Ticks per second */
+static const int PIN_PAD_A = 0;
+static const int PIN_PAD_B = 0;
+static const int PIN_PAD_START = 0;
 static const int PIN_PAD_SELECT = 0;
-static const int PIN_PAD_RIGHT  = 0;
-static const int PIN_PAD_DOWN   = 0;
-static const int PIN_PAD_LEFT   = 0;
-static const int PIN_PAD_UP     = 0;
+static const int PIN_PAD_RIGHT = 0;
+static const int PIN_PAD_DOWN = 0;
+static const int PIN_PAD_LEFT = 0;
+static const int PIN_PAD_UP = 0;
 extern int input_pins[];
 
 // setup GPIO, PIO, LCD
@@ -68,11 +69,15 @@ void finish_write_data(bool end);
 // write DMA data
 void write_data(uint8_t *data, uint16_t length);
 
-// write LCD command
-void write_command(uint8_t cmd, const uint8_t *data, int len);
+// blit a line of pixels to the LCD (handles windowing and DMA)
+// pixels: RGB565 pixel data buffer, gb_width pixels wide (doubled horizontally)
+// line: line number (0 = first line opens window, LCD_HEIGHT = close window)
+// gb_width: Game Boy LCD width (e.g. 160)
+// gb_height: Game Boy LCD height (e.g. 144)
+void lcd_blit(const uint8_t *pixels, uint_fast8_t line, int gb_width, int gb_height);
 
 // write LCD command
-// void write_command(uint8_t cmd);
+void write_command(uint8_t cmd, const uint8_t *data, int len);
 
 // SPI write
 void write_blocking(const uint8_t *data, int len);
@@ -80,8 +85,12 @@ void write_blocking(const uint8_t *data, int len);
 // SPI read
 void read_blocking(uint8_t tx_repeat, uint8_t *buff, int len);
 
-
 void kbd_interrupt();
 void set_kdb_key(uint8_t pin_offset, uint8_t key_status);
 void device_init();
 int wait_key();
+
+void picocalc_init();
+void lcd_char(uint16_t x, uint16_t y, char c, uint16_t color);
+void lcd_string(uint16_t x, uint16_t y, const char *str, uint16_t color);
+void lcd_clear(void);

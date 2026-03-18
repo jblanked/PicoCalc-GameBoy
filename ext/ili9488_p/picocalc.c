@@ -549,3 +549,112 @@ int wait_key()
     }
     return i;
 }
+
+void lcd_char(uint16_t x, uint16_t y, char c, uint16_t color)
+{
+    if (c <= 0x20 || 0x80 <= c)
+        return;
+
+    // Calcul de la position absolue sur l'écran
+    int x_screen = (WIDTH - WIDTH) / 2 + x;
+    int y_screen = (HEIGHT - HEIGHT) / 2 + y;
+
+    // Buffer temporaire juste pour un caractère (8×16 pixels × 2 octets par pixel)
+    uint8_t char_buffer[8 * 16 * 2] = {0};
+
+    // Récupérer le bitmap du caractère
+    const uint8_t *rd_ptr = bmp + (c - 0x20) * ((8 * 16 + 7) / 8);
+
+    // Remplir le buffer temporaire avec les pixels du caractère
+    for (int iy = 0; iy < 16; iy++)
+    {
+        uint8_t pattern = *(rd_ptr++);
+        for (int ix = 0; ix < 8; ix++)
+        {
+            if (pattern & 1)
+            {
+                int wr_index = iy * 16 + ix * 2;
+                char_buffer[wr_index] = (uint8_t)(color >> 8);       // high byte
+                char_buffer[wr_index + 1] = (uint8_t)(color & 0xFF); // low byte
+            }
+            pattern >>= 1;
+        }
+    }
+
+    // Définir la fenêtre d'affichage pour ce caractère
+    start_window(x_screen, y_screen, 8, 16);
+
+    // Envoyer les données du caractère
+    for (int y = 0; y < 16; y++)
+    {
+        write_data(&char_buffer[y * 16], 8);
+        finish_write_data(false);
+    }
+
+    // Finaliser l'écriture
+    finish_write_data(true);
+}
+
+void lcd_string(uint16_t x, uint16_t y, const char *str, uint16_t color)
+{
+    char c;
+    int curr_x = x;
+
+    while ((c = *(str++)) != '\0')
+    {
+        if (curr_x + 8 > WIDTH)
+            break;
+        lcd_char(curr_x, y, c, color);
+        curr_x += 8 + 1; // 8 pixels width + 1 space pixel
+    }
+}
+
+void lcd_clear(void)
+{
+    // Set window to entire screen
+    start_window(0, 0, WIDTH, HEIGHT);
+
+    // Temporary buffer for a clear line
+    uint8_t clear_line[WIDTH * 2] = {0};
+
+    // Clear the screen line by line
+    for (int y = 0; y < HEIGHT; y++)
+    {
+        write_data(clear_line, WIDTH);
+        finish_write_data(false);
+    }
+
+    finish_write_data(true);
+}
+
+void lcd_blit(const uint8_t *pixels, uint_fast8_t line, int gb_width, int gb_height)
+{
+    finish_write_data(false);
+    if (line == 0)
+    {
+        start_window((WIDTH - (gb_width * 2)) / 2, ((HEIGHT - (gb_height * 2)) / 2), gb_width * 2, gb_height * 2);
+    }
+    else if (line == gb_height)
+    {
+        finish_write_data(true);
+    }
+    else
+    {
+        write_data((uint8_t *)pixels, gb_width * 2);
+        finish_write_data(false);
+        write_data((uint8_t *)pixels, gb_width * 2);
+    }
+}
+
+void picocalc_init()
+{
+#if PICO_RP2040
+    init(266 * MHZ); // Initialize display with system clock frequency
+#elif PICO_RP2350
+    init(300 * MHZ); // Initialize display with system clock frequency
+#endif
+
+    start_game();   // Initialize display for game rendering
+    init_i2c_kbd(); // Initialize I2C keyboard interface
+    device_init();  // Initialize PocketPico device hardware
+}
