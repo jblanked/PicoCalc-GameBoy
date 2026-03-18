@@ -4,9 +4,6 @@
 [submodule "ext/peanut-gb"]
 	path = ext/peanut-gb
 	url = https://github.com/deltabeard/Peanut-GB.git
-[submodule "ext/hedley"]
-	path = ext/hedley
-	url = https://github.com/nemequ/hedley.git
 [submodule "ext/minigb_apu"]
 	path = ext/minigb_apu
 	url = https://github.com/deltabeard/minigb_apu.git
