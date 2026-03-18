@@ -42,7 +42,7 @@ add_executable(PocketPico
         ext/minigb_apu/minigb_apu.c
 )
 
-target_include_directories(PocketPico PRIVATE inc ext/hedley ext/peanut-gb ext/minigb_apu)
+target_include_directories(PocketPico PRIVATE inc ext/peanut-gb ext/minigb_apu)
 
 target_link_libraries(PocketPico
         FatFs_SPI
@@ -54,6 +54,7 @@ target_link_libraries(PocketPico
 target_compile_definitions(PocketPico PRIVATE
         PARAM_ASSERTIONS_DISABLE_ALL=1
         PICO_ENTER_USB_BOOT_ON_EXIT=1
+        PICO_FLASH_ASSUME_CORE1_SAFE=1
         PICO_STDIO_ENABLE_CRLF_SUPPORT=0
         PICO_STDIO_DEFAULT_CRLF=0
         PICO_PRINTF_SUPPORT_FLOAT=0
