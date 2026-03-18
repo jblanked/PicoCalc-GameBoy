@@ -67,7 +67,7 @@ void start_game();
 void finish_write_data(bool end);
 
 // write DMA data
-void write_data(uint8_t *data, uint16_t length);
+void write_data(const uint8_t *data, uint16_t length);
 
 // blit a line of pixels to the LCD (handles windowing and DMA)
 // pixels: RGB565 pixel data buffer, gb_width pixels wide (doubled horizontally)

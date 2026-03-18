@@ -15,7 +15,9 @@ enum gb_error_e;
  * @param addr Address to read from
  * @return The byte at the specified address
  */
-uint8_t gb_rom_read(struct gb_s *gb, const uint_fast32_t addr);
+uint8_t gb_rom_read_8bit(struct gb_s *gb, const uint_fast32_t addr);
+uint16_t gb_rom_read_16bit(struct gb_s *gb, const uint_fast32_t addr);
+uint32_t gb_rom_read_32bit(struct gb_s *gb, const uint_fast32_t addr);
 
 /**
  * Cartridge RAM Read Callback

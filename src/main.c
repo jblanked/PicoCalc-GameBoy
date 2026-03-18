@@ -38,9 +38,9 @@
 #include "i2ckbd.h"
 #include "gbcolors.h"
 
-#define PEANUT_GB_HEADER_ONLY
-#ifndef PEANUT_GB_H
-#include "peanut_gb.h"
+#define WALNUT_GB_HEADER_ONLY
+#ifndef WALNUT_GB_H
+#include "walnut_cgb.h"
 #endif
 
 #include <hardware/vreg.h>
@@ -88,7 +88,7 @@ void lcd_draw_line(struct gb_s *gb, const uint8_t pixels[LCD_WIDTH],
                    const uint_fast8_t line)
 {
     // Duplicate each pixel horizontally (160 -> 320 pixels)
-#if PEANUT_FULL_GBC_SUPPORT
+#if PEANUT_FULL_GBC_SUPPORT || WALNUT_FULL_GBC_SUPPORT
     if (gb->cgb.cgbMode)
     {
         for (unsigned int x = 0; x < LCD_WIDTH; x++)
@@ -118,7 +118,7 @@ void lcd_draw_line(struct gb_s *gb, const uint8_t pixels[LCD_WIDTH],
             pixels_buffer[x * 4 + 2] = (uint8_t)(pixel >> 8);   // high byte of second pixel
             pixels_buffer[x * 4 + 3] = (uint8_t)(pixel & 0xFF); // low byte of second pixel
         }
-#if PEANUT_FULL_GBC_SUPPORT
+#if PEANUT_FULL_GBC_SUPPORT || WALNUT_FULL_GBC_SUPPORT
     }
 #endif
 
@@ -187,12 +187,14 @@ int main(void)
         /* Initialize Game Boy emulator */
         BUFFER_ROM_BANK0_FILL();          // Copy ROM bank 0 to RAM for faster access
         ret = gb_init(&gb,                // Initialize Game Boy context
-                      &gb_rom_read,       // ROM read callback
+                      &gb_rom_read_8bit,  // 8-bit ROM read callback
+                      &gb_rom_read_16bit, // 16-bit ROM read callback
+                      &gb_rom_read_32bit, // 32-bit ROM read callback
                       &gb_cart_ram_read,  // RAM read callback
                       &gb_cart_ram_write, // RAM write callback
                       &gb_error,          // Error handling callback
                       NULL);              // No custom context
-        DBG_INFO("GB ");
+        DBG_INFO("GB Init returned: %d\n", ret);
 
         if (ret != GB_INIT_NO_ERROR)
         {
@@ -204,7 +206,9 @@ int main(void)
         /* Load saved emulator state */
         read_gb_emulator_state(&gb); // Try to load last saved emulator state
         /* Restore function pointers overwritten by state load (addresses change between builds) */
-        gb.gb_rom_read = &gb_rom_read;
+        gb.gb_rom_read = &gb_rom_read_8bit;
+        gb.gb_rom_read_16bit = &gb_rom_read_16bit;
+        gb.gb_rom_read_32bit = &gb_rom_read_32bit;
         gb.gb_cart_ram_read = &gb_cart_ram_read;
         gb.gb_cart_ram_write = &gb_cart_ram_write;
         gb.gb_error = &gb_error;
@@ -216,18 +220,21 @@ int main(void)
                             gb_colour_hash(&gb),
                             gb_get_rom_name(&gb, rom_title));
 
+        DBG_INFO("Initializing LCD...\n");
         gb_init_lcd(&gb, &lcd_draw_line); // Initialize LCD with draw line callback
-        DBG_INFO("LCD ");
-        DBG_INFO("\n> ");
+        DBG_INFO("LCD initialized\n");
+        sleep_ms(10);
+#if ENABLE_DEBUG
         uint_fast32_t frames = 0;
         uint64_t start_time = time_us_64();
+#endif
+        int input;
+        DBG_INFO("START\n");
+        sleep_ms(10);
         while (1)
         {
-            int input;
-
             /* Execute CPU cycles until the screen has to be redrawn. */
-            gb_run_frame(&gb);
-            frames++;
+            gb_run_frame_dualfetch(&gb);
 
 #if ENABLE_SOUND
             if (!gb.direct.frame_skip)
