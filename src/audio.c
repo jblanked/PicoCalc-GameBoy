@@ -1,7 +1,10 @@
 #include "audio.h"
 #include "shared.h"
-#ifdef ENABLE_SOUND
+#if ENABLE_SOUND
 #include "../ext/PicoAudio/audio.h"
+#endif
+#if PICO_RP2040
+#include <pico/multicore.h>
 #endif
 
 queue_t call_queue;
@@ -9,9 +12,11 @@ int16_t *stream;
 
 void audio_process(void)
 {
-#ifdef ENABLE_SOUND
+#if ENABLE_SOUND
 #if PICO_RP2350
     flash_safe_execute_core_init();
+#elif PICO_RP2040
+    multicore_lockout_victim_init(); // Allow core 0 to safely lock us out during flash operations
 #endif
 
     /* Allocate memory for the stream buffer */
