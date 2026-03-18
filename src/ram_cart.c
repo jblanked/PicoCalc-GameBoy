@@ -32,7 +32,7 @@ void write_cart_ram_file(struct gb_s *gb)
     if (save_size > 0)
     {
         SD_FILE_WRITE(filename, ram, save_size);
-        DBG_INFO("I write_cart_ram_file(%s) COMPLETE (%lu bytes)\n", filename, bw);
+        DBG_INFO("I write_cart_ram_file(%s) COMPLETE (%lu bytes)\n", filename, save_size);
     }
     else
     {
