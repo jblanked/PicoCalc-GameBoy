@@ -1,6 +1,7 @@
 /**
  * Copyright (C) 2022 by Mahyar Koshkouei <mk@deltabeard.com>
  * Copyright (C) 2024 by Vlastimil Slintak <slintak@uart.cz>
+ * Copyright (C) 2026 by JBlanked <jblanked@jblanked.com> (multi-platform support and optimizations)
  *
  * Permission to use, copy, modify, and/or distribute this software for any
  * purpose with or without fee is hereby granted.
@@ -25,6 +26,7 @@
 #include "config.h"
 #include LCD_INCLUDE
 #include BUTTON_INCLUDE
+#include BUFFER_INCLUDE
 #include "shared.h"
 #include "ram_cart.h"
 #include "flash.h"
@@ -47,9 +49,6 @@
 #if ENABLE_SOUND
 struct minigb_apu_ctx apu_ctx = {0}; // Game Boy APU context
 #endif
-const uint8_t *rom = (const uint8_t *)(XIP_BASE + FLASH_TARGET_OFFSET);
-unsigned char rom_bank0[32768];         // 32KB buffer for ROM bank 0 (cached in RAM for faster access)
-uint8_t ram[32768];                     // 32KB buffer for cartridge RAM
 uint8_t pixels_buffer[WIDTH * 2] = {0}; // Line buffer for rendering Game Boy LCD output
 palette_t palette;                      // Current color palette
 uint8_t manual_palette_selected = 0;    // Index of manually selected palette
@@ -143,6 +142,18 @@ int main(void)
     const int buf_words = (16 * 4) + 1; // Maximum of 16 partitions, each with maximum of 4 words returned, plus 1
     uint32_t *buffer = malloc(buf_words * 4);
 
+#ifdef BUFFER_ROM_INIT
+    BUFFER_ROM_INIT(); // Initialize ROM buffer
+#endif
+
+#ifdef BUFFER_RAM_INIT
+    BUFFER_RAM_INIT(); // Initialize RAM buffer
+#endif
+
+#ifdef BUFFER_ROM_BANK0_INIT
+    BUFFER_ROM_BANK0_INIT(); // Initialize ROM bank 0 buffer
+#endif
+
     /* Initialize system hardware */
     vreg_set_voltage(VREG_VOLT);                  // Set voltage for overclocking
     sleep_ms(100);                                // Wait for voltage to stabilize
@@ -176,13 +187,13 @@ int main(void)
 #endif
 
         /* Initialize Game Boy emulator */
-        memcpy(rom_bank0, rom, sizeof(rom_bank0)); // Copy ROM bank 0 to RAM for faster access
-        ret = gb_init(&gb,                         // Initialize Game Boy context
-                      &gb_rom_read,                // ROM read callback
-                      &gb_cart_ram_read,           // RAM read callback
-                      &gb_cart_ram_write,          // RAM write callback
-                      &gb_error,                   // Error handling callback
-                      NULL);                       // No custom context
+        BUFFER_ROM_BANK0_FILL();          // Copy ROM bank 0 to RAM for faster access
+        ret = gb_init(&gb,                // Initialize Game Boy context
+                      &gb_rom_read,       // ROM read callback
+                      &gb_cart_ram_read,  // RAM read callback
+                      &gb_cart_ram_write, // RAM write callback
+                      &gb_error,          // Error handling callback
+                      NULL);              // No custom context
         DBG_INFO("GB ");
 
         if (ret != GB_INIT_NO_ERROR)

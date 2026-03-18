@@ -16,6 +16,22 @@
 #define SYS_CLK_FREQ 300 * MHZ
 #endif
 
+// buffer settings
+#define BUFFER_RAM_SIZE 32768
+#define BUFFER_ROM_SIZE 1048576
+#define BUFFER_ROM_BANK0_SIZE 32768
+#define BUFFER_INCLUDE "buffer.h"
+#define BUFFER_RAM_INIT buffer_ram_init
+#define BUFFER_RAM_BUFFER_READ buffer_ram_buffer_read
+#define BUFFER_RAM_BUFFER_WRITE buffer_ram_buffer_write
+#define BUFFER_ROM_INIT buffer_rom_init
+#define BUFFER_ROM_BUFFER_READ buffer_rom_buffer_read
+#define BUFFER_ROM_BUFFER_WRITE buffer_rom_buffer_write
+#define BUFFER_ROM_BANK0_INIT buffer_rom_bank0_init
+#define BUFFER_ROM_BANK0_READ buffer_rom_bank0_read
+#define BUFFER_ROM_BANK0_WRITE buffer_rom_bank0_write
+#define BUFFER_ROM_BANK0_FILL buffer_rom_bank0_fill
+
 /* Audio Hardware Configuration */
 #define AUDIO_DATA_PIN 26  // I2S data pin
 #define AUDIO_CLOCK_PIN 27 // I2S clock pin
@@ -35,13 +51,15 @@
 
 // storage methods
 #define SD_INCLUDE "sdcard.h"
-#define SD_FILE_READ file_read                       // (const char *filename, uint8_t *buffer, size_t buffer_size) -> size_t
-#define SD_FILE_SIZE file_size                       // (const char *filename) -> size_t
-#define SD_FILE_WRITE file_write                     // (const char *filename, const uint8_t *buffer, size_t buffer_size) -> bool
-#define SD_FILE_LIST file_list                       // (const char *pattern, char filenames[][256], uint16_t skip, uint16_t max_count) -> uint16_t
-#define SD_FILE_OPEN file_open                       // (const char *filename) -> void *
-#define SD_FILE_CLOSE file_close                     // (void *handle) -> void
-#define SD_FILE_READ_FILE_CHUNK file_read_file_chunk // (void *handle, uint8_t *buffer, size_t buffer_size) -> size_t
+#define SD_FILE_READ file_read                         // (const char *filename, uint8_t *buffer, size_t buffer_size) -> size_t
+#define SD_FILE_SIZE file_size                         // (const char *filename) -> size_t
+#define SD_FILE_WRITE file_write                       // (const char *filename, const uint8_t *buffer, size_t buffer_size) -> bool
+#define SD_FILE_LIST file_list                         // (const char *pattern, char filenames[][256], uint16_t skip, uint16_t max_count) -> uint16_t
+#define SD_FILE_OPEN file_open                         // (const char *filename) -> void *
+#define SD_FILE_CLOSE file_close                       // (void *handle) -> void
+#define SD_FILE_READ_FILE_CHUNK file_read_file_chunk   // (void *handle, uint8_t *buffer, size_t buffer_size) -> size_t
+#define SD_FILE_WRITE_OPEN file_write_open             // (const char *filename) -> void *
+#define SD_FILE_WRITE_FILE_CHUNK file_write_file_chunk // (void *handle, const uint8_t *data, size_t size) -> bool
 
 // buttons
 #define BUTTON_INCLUDE "picocalc.h"

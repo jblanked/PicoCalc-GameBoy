@@ -3,6 +3,7 @@
 #include SD_INCLUDE
 #include "flash.h"
 #include LCD_INCLUDE
+#include BUFFER_INCLUDE
 
 /**
  * Load ROM File
@@ -48,13 +49,15 @@ void load_cart_rom_file(char *filename)
 
         /* Read back target region and check programming */
         DBG_INFO("I Done. Reading back target region...\n");
+        uint8_t rom_val;
         for (uint32_t i = 0; i < FLASH_SECTOR_SIZE; i++)
         {
-            if (rom[file_offset + i] != buffer[i])
+            BUFFER_ROM_BUFFER_READ(file_offset + i, &rom_val, 1);
+            if (rom_val != buffer[i])
             {
                 DBG_INFO("E Mismatch at address 0x%08X: read 0x%02X, expected 0x%02X\n",
                          (unsigned)(flash_target_offset + i),
-                         rom[file_offset + i], buffer[i]);
+                         rom_val, buffer[i]);
                 mismatch = true;
             }
         }
@@ -135,8 +138,6 @@ void rom_file_selector()
 
     /* select the first rom */
     uint8_t selected = 0;
-    DBG_INFO("ROM File Selector: Waiting 5 seconds before highlighting first ROM\n");
-
     DBG_INFO("ROM File Selector: Highlighting first ROM: %s\n", filename[selected]);
     sprintf(buf, "%02d", selected + 1);
 #ifdef LCD_STRING

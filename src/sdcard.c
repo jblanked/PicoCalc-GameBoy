@@ -282,3 +282,43 @@ size_t file_read_file_chunk(void *handle, uint8_t *buffer, size_t buffer_size)
     f_read((FIL *)handle, buffer, buffer_size, &br);
     return br;
 }
+
+void *file_write_open(const char *filename)
+{
+    sd_card_t *pSD = sd_get_by_num(0);
+    FRESULT fr = f_mount(&pSD->fatfs, pSD->pcName, 1);
+    if (FR_OK != fr)
+    {
+        DBG_INFO("E f_mount error: %s (%d)\n", FRESULT_str(fr), fr);
+        return NULL;
+    }
+
+    FIL *fil = malloc(sizeof(FIL));
+    if (!fil)
+    {
+        DBG_INFO("E file_write_open: out of memory\n");
+        f_unmount(pSD->pcName);
+        return NULL;
+    }
+
+    fr = f_open(fil, filename, FA_CREATE_ALWAYS | FA_WRITE);
+    if (fr != FR_OK)
+    {
+        DBG_INFO("E f_open(%s) error: %s (%d)\n", filename, FRESULT_str(fr), fr);
+        free(fil);
+        f_unmount(pSD->pcName);
+        return NULL;
+    }
+
+    return fil;
+}
+
+bool file_write_file_chunk(void *handle, const uint8_t *data, size_t size)
+{
+    if (!handle)
+        return false;
+
+    UINT bw = 0;
+    FRESULT fr = f_write((FIL *)handle, data, size, &bw);
+    return fr == FR_OK && bw == (UINT)size;
+}

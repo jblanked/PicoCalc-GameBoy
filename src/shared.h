@@ -25,10 +25,7 @@ extern struct minigb_apu_ctx apu_ctx;
  * Once done, we access this at XIP_BASE + 1MB.
  * Game Boy DMG ROM sizes range from 32KB (e.g. Tetris) to 1MB (e.g. Pokemod Red)
  */
-#define FLASH_TARGET_OFFSET (1024 * 1024) // 1MB offset from flash start
-extern const uint8_t *rom;
-extern unsigned char rom_bank0[32768];              // 32KB buffer for ROM bank 0
-extern uint8_t ram[32768];                          // 32KB buffer for cartridge RAM
+#define FLASH_TARGET_OFFSET (1024 * 1024)           // 1MB offset from flash start
 extern uint8_t pixels_buffer[FRAME_BUFF_WIDTH * 2]; // Line buffer for LCD rendering
 extern palette_t palette;                           // Current color palette
 extern uint8_t manual_palette_selected;             // Index of manually selected palette
