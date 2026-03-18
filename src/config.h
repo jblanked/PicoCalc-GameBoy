@@ -4,16 +4,17 @@
 #define ENABLE_DEBUG 0                // Enable debug output
 #define ENABLE_SOUND 1                // Enable sound output
 #define ENABLE_SDCARD 1               // Enable SD card for ROM and save storage
-#define PEANUT_GB_HIGH_LCD_ACCURACY 1 // Use high accuracy LCD emulation
 #define PEANUT_FULL_GBC_SUPPORT 1     // Enable full Game Boy Color support
+#define WALNUT_GB_HIGH_LCD_ACCURACY 1 // Use high accuracy LCD emulation
+#define WALNUT_FULL_GBC_SUPPORT 1     // Enable full Game Boy Color support
 
 // system configuration (266MHz for RP2040, 300MHz for RP2350)
 #if PICO_RP2040
 #define VREG_VOLT VREG_VOLTAGE_1_15
-#define SYS_CLK_FREQ 266 * MHZ
+#define SYS_CLK_FREQ 266 * MHZ // Set system clock to 266 MHz
 #elif PICO_RP2350
 #define VREG_VOLT VREG_VOLTAGE_1_30
-#define SYS_CLK_FREQ 300 * MHZ
+#define SYS_CLK_FREQ 300 * MHZ // Set system clock to 300 MHz
 #endif
 
 // ROM storage backend (flash by default; swap macros for PSRAM or other memory)
@@ -33,11 +34,11 @@
 // buffer settings
 #define BUFFER_ROM_SIZE 1048576
 #if PICO_RP2040
-#define BUFFER_RAM_SIZE 1024 * 32
-#define BUFFER_ROM_BANK0_SIZE 1024 * 32
+#define BUFFER_RAM_SIZE 0x1000
+#define BUFFER_ROM_BANK0_SIZE 65536
 #elif PICO_RP2350
-#define BUFFER_RAM_SIZE 1024 * 128
-#define BUFFER_ROM_BANK0_SIZE 1024 * 128
+#define BUFFER_RAM_SIZE 0x40000
+#define BUFFER_ROM_BANK0_SIZE 65536
 #endif
 #define BUFFER_INCLUDE "buffer.h"
 #define BUFFER_RAM_INIT buffer_ram_init
@@ -67,6 +68,7 @@
 #define LCD_STRING lcd_string  // (uint16_t x, uint16_t y, const char *str, uint16_t color)
 #define LCD_CLEAR lcd_clear    // (void)
 #define LCD_BLIT lcd_blit      // (const uint8_t *pixels, uint16_t line)
+#define LCD_BAUDRATE 80000000  // Set fast SPI baud rate for LCD
 
 // storage methods
 #define SD_INCLUDE "sdcard.h"

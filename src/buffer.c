@@ -30,11 +30,11 @@ void buffer_rom_bank0_init(void)
     memset(rom_bank0, 0, sizeof(rom_bank0)); // Initialize ROM bank 0 buffer to zero
 }
 
-void buffer_rom_bank0_read(uint32_t source, uint8_t *data, uint32_t length)
+void buffer_rom_bank0_read(uint32_t source, void *data, uint32_t length)
 {
     if (source + length > sizeof(rom_bank0))
-        return;                               // Prevent out-of-bounds access
-    memcpy(data, rom_bank0 + source, length); // Read data from ROM bank 0 buffer
+        return;
+    memcpy(data, rom_bank0 + source, length);
 }
 
 void buffer_rom_bank0_write(uint32_t destination, const uint8_t *data, uint32_t length)
@@ -54,7 +54,7 @@ void buffer_rom_init(void)
     // no initialization needed
 }
 
-void buffer_rom_buffer_read(uint32_t source, uint8_t *data, uint32_t length)
+void buffer_rom_buffer_read(uint32_t source, void *data, uint32_t length)
 {
     memcpy(data, rom + source, length); // Read data directly from flash memory
 }

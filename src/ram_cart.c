@@ -4,9 +4,9 @@
 #include SD_INCLUDE
 #include BUFFER_INCLUDE
 
-#define PEANUT_GB_HEADER_ONLY
-#ifndef PEANUT_GB_H
-#include "peanut_gb.h"
+#define WALNUT_GB_HEADER_ONLY
+#ifndef WALNUT_GB_H
+#include "walnut_cgb.h"
 #endif
 
 #define RAM_CART_CHUNK_SIZE 256
@@ -14,8 +14,9 @@
 void read_cart_ram_file(struct gb_s *gb)
 {
     char filename[16];
+    size_t save_size = 0;
     gb_get_rom_name(gb, filename);
-    uint_fast32_t save_size = gb_get_save_size(gb);
+    gb_get_save_size_s(gb, &save_size);
     if (save_size > 0)
     {
         uint8_t chunk[RAM_CART_CHUNK_SIZE];
@@ -47,8 +48,9 @@ void read_cart_ram_file(struct gb_s *gb)
 void write_cart_ram_file(struct gb_s *gb)
 {
     char filename[16];
+    size_t save_size = 0;
     gb_get_rom_name(gb, filename);
-    uint_fast32_t save_size = gb_get_save_size(gb);
+    gb_get_save_size_s(gb, &save_size);
     if (save_size > 0)
     {
         uint8_t chunk[RAM_CART_CHUNK_SIZE];

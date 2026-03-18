@@ -265,7 +265,7 @@ void start_window(int x0, int y0, int w, int h)
     }
 }
 
-void write_data(uint8_t *data, uint16_t length)
+void write_data(const uint8_t *data, uint16_t length)
 {
     dma_channel_transfer_from_buffer_now(dma_tx, data, length * 2);
     /* Start the DMA transfer
@@ -633,9 +633,16 @@ void lcd_blit(const uint8_t *pixels, uint_fast8_t line, int gb_width, int gb_hei
     if (line == 0)
     {
         start_window((WIDTH - (gb_width * 2)) / 2, ((HEIGHT - (gb_height * 2)) / 2), gb_width * 2, gb_height * 2);
+        write_data(pixels, gb_width * 2);
+        finish_write_data(false);
+        write_data(pixels, gb_width * 2);
     }
-    else if (line == gb_height)
+    else if (line == (uint_fast8_t)(gb_height - 1))
     {
+        /* Last visible scanline: write both rows then close the SPI transaction */
+        write_data((uint8_t *)pixels, gb_width * 2);
+        finish_write_data(false);
+        write_data((uint8_t *)pixels, gb_width * 2);
         finish_write_data(true);
     }
     else

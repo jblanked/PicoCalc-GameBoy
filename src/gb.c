@@ -1,24 +1,53 @@
 #include "gb.h"
-#include "shared.h"
 #include "config.h"
+#include "debug.h"
+#include "shared.h"
 
-#ifndef PEANUT_GB_H
-#include "peanut_gb.h"
+#ifndef WALNUT_GB_H
+#include "walnut_cgb.h"
 #endif
 
 #include BUFFER_INCLUDE
 
-uint8_t gb_rom_read(struct gb_s *gb, const uint_fast32_t addr)
+uint8_t gb_rom_read_8bit(struct gb_s *gb, const uint_fast32_t addr)
 {
     (void)gb;
     if (addr < BUFFER_ROM_BANK0_SIZE)
     {
         uint8_t val;
-        BUFFER_ROM_BANK0_READ(addr, &val, 1);
+        BUFFER_ROM_BANK0_READ(addr, &val, sizeof(val));
         return val;
     }
     uint8_t val;
-    BUFFER_ROM_BUFFER_READ(addr, &val, 1);
+    BUFFER_ROM_BUFFER_READ(addr, &val, sizeof(val));
+    return val;
+}
+
+uint16_t gb_rom_read_16bit(struct gb_s *gb, const uint_fast32_t addr)
+{
+    (void)gb;
+    if (addr < BUFFER_ROM_BANK0_SIZE)
+    {
+        uint16_t val;
+        BUFFER_ROM_BANK0_READ(addr, (uint8_t *)&val, sizeof(val));
+        return val;
+    }
+    uint16_t val;
+    BUFFER_ROM_BUFFER_READ(addr, (uint8_t *)&val, sizeof(val));
+    return val;
+}
+
+uint32_t gb_rom_read_32bit(struct gb_s *gb, const uint_fast32_t addr)
+{
+    (void)gb;
+    if (addr < BUFFER_ROM_BANK0_SIZE)
+    {
+        uint32_t val;
+        BUFFER_ROM_BANK0_READ(addr, (uint8_t *)&val, sizeof(val));
+        return val;
+    }
+    uint32_t val;
+    BUFFER_ROM_BUFFER_READ(addr, (uint8_t *)&val, sizeof(val));
     return val;
 }
 
