@@ -2,17 +2,20 @@
 #include "config.h"
 #include <stdint.h>
 #include "debug.h"
-#include "minigb_apu.h"
 
 #ifndef PALETTE_T_DEFINED
 #define PALETTE_T_DEFINED
 typedef uint16_t palette_t[3][4];
 #endif
+
+#if ENABLE_SOUND
+#include "minigb_apu.h"
 extern struct minigb_apu_ctx apu_ctx;
 #undef audio_read
 #undef audio_write
 #define audio_read(a) audio_read(&apu_ctx, (a))
 #define audio_write(a, v) audio_write(&apu_ctx, (a), (v));
+#endif
 
 /**
  * ROM Storage Configuration
