@@ -42,3 +42,14 @@
 #define SD_FILE_OPEN file_open                       // (const char *filename) -> void *
 #define SD_FILE_CLOSE file_close                     // (void *handle) -> void
 #define SD_FILE_READ_FILE_CHUNK file_read_file_chunk // (void *handle, uint8_t *buffer, size_t buffer_size) -> size_t
+
+// buttons
+#define BUTTON_INCLUDE "picocalc.h"
+#define BUTTON_UP input_pins[KEY_UP] == 0 ? 1 : 0
+#define BUTTON_DOWN input_pins[KEY_DOWN] == 0 ? 1 : 0
+#define BUTTON_LEFT input_pins[KEY_LEFT] == 0 ? 1 : 0
+#define BUTTON_RIGHT input_pins[KEY_RIGHT] == 0 ? 1 : 0
+#define BUTTON_A input_pins[KEY_A] == 0 ? 1 : 0
+#define BUTTON_B input_pins[KEY_B] == 0 ? 1 : 0
+#define BUTTON_SELECT input_pins[KEY_SELECT] == 0 ? 1 : 0
+#define BUTTON_START input_pins[KEY_START] == 0 ? 1 : 0

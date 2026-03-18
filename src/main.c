@@ -24,6 +24,7 @@
 
 #include "config.h"
 #include LCD_INCLUDE
+#include BUTTON_INCLUDE
 #include "shared.h"
 #include "ram_cart.h"
 #include "flash.h"
@@ -235,14 +236,14 @@ int main(void)
             prev_joypad_bits.b = gb.direct.joypad_bits.b;
             prev_joypad_bits.select = gb.direct.joypad_bits.select;
             prev_joypad_bits.start = gb.direct.joypad_bits.start;
-            gb.direct.joypad_bits.up = input_pins[KEY_UP] == 0 ? 1 : 0;
-            gb.direct.joypad_bits.down = input_pins[KEY_DOWN] == 0 ? 1 : 0;
-            gb.direct.joypad_bits.left = input_pins[KEY_LEFT] == 0 ? 1 : 0;
-            gb.direct.joypad_bits.right = input_pins[KEY_RIGHT] == 0 ? 1 : 0;
-            gb.direct.joypad_bits.a = input_pins[KEY_A] == 0 ? 1 : 0;
-            gb.direct.joypad_bits.b = input_pins[KEY_B] == 0 ? 1 : 0;
-            gb.direct.joypad_bits.select = input_pins[KEY_SELECT] == 0 ? 1 : 0;
-            gb.direct.joypad_bits.start = input_pins[KEY_START] == 0 ? 1 : 0;
+            gb.direct.joypad_bits.up = BUTTON_UP;
+            gb.direct.joypad_bits.down = BUTTON_DOWN;
+            gb.direct.joypad_bits.left = BUTTON_LEFT;
+            gb.direct.joypad_bits.right = BUTTON_RIGHT;
+            gb.direct.joypad_bits.a = BUTTON_A;
+            gb.direct.joypad_bits.b = BUTTON_B;
+            gb.direct.joypad_bits.select = BUTTON_SELECT;
+            gb.direct.joypad_bits.start = BUTTON_START;
 
             /* hotkeys (select + * combo)*/
             if (!gb.direct.joypad_bits.select)
