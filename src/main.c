@@ -47,10 +47,10 @@
 #if ENABLE_SOUND
 struct minigb_apu_ctx apu_ctx = {0}; // Game Boy APU context
 #endif
-uint8_t pixels_buffer[WIDTH * 2] = {0}; // Line buffer for rendering Game Boy LCD output
-palette_t palette;                      // Current color palette
-uint8_t manual_palette_selected = 0;    // Index of manually selected palette
-int lcd_line_busy = 0;                  // Flag for LCD line rendering status
+uint8_t pixels_buffer[FRAME_BUFF_WIDTH * 2] = {0}; // Line buffer for rendering Game Boy LCD output
+palette_t palette;                                 // Current color palette
+uint8_t manual_palette_selected = 0;               // Index of manually selected palette
+int lcd_line_busy = 0;                             // Flag for LCD line rendering status
 
 /**
  * Previous Joypad State
