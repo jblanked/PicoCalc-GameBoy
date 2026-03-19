@@ -29,7 +29,6 @@
 #include BUFFER_INCLUDE
 #include "shared.h"
 #include "ram_cart.h"
-#include "flash.h"
 #include "state.h"
 #include "rom.h"
 #include "gb.h"
