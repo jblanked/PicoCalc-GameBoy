@@ -5,6 +5,10 @@
 #include LCD_INCLUDE
 #include BUFFER_INCLUDE
 
+#ifdef BUTTON_INCLUDE
+#include BUTTON_INCLUDE
+#endif
+
 /**
  * Load ROM File
  *
@@ -122,14 +126,14 @@ uint16_t rom_file_selector_display_page(char filename[22][256], uint16_t num_pag
 void rom_file_selector()
 {
     DBG_INFO("ROM File Selector: Starting...\n");
+#ifdef BUTTON_WAIT
     uint16_t num_page = 0;
     char filename[22][256];
-    uint16_t num_file;
     char buf[6];
     bool break_outer = false;
 
     /* display the first page with up to 22 rom files */
-    num_file = rom_file_selector_display_page(filename, num_page);
+    uint16_t num_file = rom_file_selector_display_page(filename, num_page);
     DBG_INFO("ROM File Selector: Found %d files on first page\n", num_file);
 
     /* select the first rom */
@@ -144,7 +148,7 @@ void rom_file_selector()
     /* get user's input */
     while (true)
     {
-        switch (wait_key())
+        switch (BUTTON_WAIT())
         {
         case KEY_A:
         case KEY_B:
@@ -209,6 +213,7 @@ void rom_file_selector()
         if (break_outer)
             break;
     }
+#endif
 
     DBG_INFO("ROM File Selector: Exiting selector\n");
 }

@@ -94,6 +94,7 @@
 
 // buttons
 #define BUTTON_INCLUDE "picocalc.h"
+#define BUTTON_WAIT wait_key // () -> int (returns KEY_* value)
 #define BUTTON_UP input_pins[KEY_UP] == 0 ? 1 : 0
 #define BUTTON_DOWN input_pins[KEY_DOWN] == 0 ? 1 : 0
 #define BUTTON_LEFT input_pins[KEY_LEFT] == 0 ? 1 : 0
