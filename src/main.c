@@ -135,10 +135,8 @@ void lcd_draw_line(struct gb_s *gb, const uint8_t pixels[LCD_WIDTH],
  */
 int main(void)
 {
-    static struct gb_s gb;              // Game Boy emulator context
-    enum gb_init_error_e ret;           // Initialization error code
-    const int buf_words = (16 * 4) + 1; // Maximum of 16 partitions, each with maximum of 4 words returned, plus 1
-    uint32_t *buffer = malloc(buf_words * 4);
+    static struct gb_s gb;    // Game Boy emulator context
+    enum gb_init_error_e ret; // Initialization error code
 
 #ifdef BUFFER_ROM_INIT
     BUFFER_ROM_INIT(); // Initialize ROM buffer
