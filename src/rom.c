@@ -142,7 +142,6 @@ void rom_file_selector()
 #endif
 
     /* get user's input */
-    bool up = true, down = true, left = true, right = true, a = true, b = true, select = true, start = true;
     while (true)
     {
         switch (wait_key())
