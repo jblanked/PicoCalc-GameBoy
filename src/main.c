@@ -35,7 +35,6 @@
 #include "gb.h"
 #include "audio.h"
 #include "sdcard.h"
-#include "i2ckbd.h"
 #include "gbcolors.h"
 
 #define WALNUT_GB_HEADER_ONLY
