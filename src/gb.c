@@ -67,10 +67,16 @@ void gb_cart_ram_write(struct gb_s *gb, const uint_fast32_t addr,
 
 void gb_error(struct gb_s *gb, const enum gb_error_e gb_err, const uint16_t addr)
 {
+#if ENABLE_DEBUG
     const char *gb_err_str[4] = {
         "UNKNOWN",
         "INVALID OPCODE",
         "INVALID READ",
         "INVALID WRITE"};
     DBG_INFO("Error %d occurred: %s at %04X\n.\n", gb_err, gb_err_str[gb_err], addr);
+#else
+    (void)gb;
+    (void)gb_err;
+    (void)addr;
+#endif
 }

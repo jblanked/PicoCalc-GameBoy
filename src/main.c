@@ -29,13 +29,11 @@
 #include BUFFER_INCLUDE
 #include "shared.h"
 #include "ram_cart.h"
-#include "flash.h"
 #include "state.h"
 #include "rom.h"
 #include "gb.h"
 #include "audio.h"
 #include "sdcard.h"
-#include "i2ckbd.h"
 #include "gbcolors.h"
 
 #define WALNUT_GB_HEADER_ONLY
@@ -49,10 +47,10 @@
 #if ENABLE_SOUND
 struct minigb_apu_ctx apu_ctx = {0}; // Game Boy APU context
 #endif
-uint8_t pixels_buffer[WIDTH * 2] = {0}; // Line buffer for rendering Game Boy LCD output
-palette_t palette;                      // Current color palette
-uint8_t manual_palette_selected = 0;    // Index of manually selected palette
-int lcd_line_busy = 0;                  // Flag for LCD line rendering status
+uint8_t pixels_buffer[FRAME_BUFF_WIDTH * 2] = {0}; // Line buffer for rendering Game Boy LCD output
+palette_t palette;                                 // Current color palette
+uint8_t manual_palette_selected = 0;               // Index of manually selected palette
+int lcd_line_busy = 0;                             // Flag for LCD line rendering status
 
 /**
  * Previous Joypad State
@@ -137,10 +135,7 @@ void lcd_draw_line(struct gb_s *gb, const uint8_t pixels[LCD_WIDTH],
  */
 int main(void)
 {
-    static struct gb_s gb;              // Game Boy emulator context
-    enum gb_init_error_e ret;           // Initialization error code
-    const int buf_words = (16 * 4) + 1; // Maximum of 16 partitions, each with maximum of 4 words returned, plus 1
-    uint32_t *buffer = malloc(buf_words * 4);
+    static struct gb_s gb; // Game Boy emulator context
 
 #ifdef BUFFER_ROM_INIT
     BUFFER_ROM_INIT(); // Initialize ROM buffer
@@ -185,15 +180,15 @@ int main(void)
 #endif
 
         /* Initialize Game Boy emulator */
-        BUFFER_ROM_BANK0_FILL();          // Copy ROM bank 0 to RAM for faster access
-        ret = gb_init(&gb,                // Initialize Game Boy context
-                      &gb_rom_read_8bit,  // 8-bit ROM read callback
-                      &gb_rom_read_16bit, // 16-bit ROM read callback
-                      &gb_rom_read_32bit, // 32-bit ROM read callback
-                      &gb_cart_ram_read,  // RAM read callback
-                      &gb_cart_ram_write, // RAM write callback
-                      &gb_error,          // Error handling callback
-                      NULL);              // No custom context
+        BUFFER_ROM_BANK0_FILL();                               // Copy ROM bank 0 to RAM for faster access
+        enum gb_init_error_e ret = gb_init(&gb,                // Initialize Game Boy context
+                                           &gb_rom_read_8bit,  // 8-bit ROM read callback
+                                           &gb_rom_read_16bit, // 16-bit ROM read callback
+                                           &gb_rom_read_32bit, // 32-bit ROM read callback
+                                           &gb_cart_ram_read,  // RAM read callback
+                                           &gb_cart_ram_write, // RAM write callback
+                                           &gb_error,          // Error handling callback
+                                           NULL);              // No custom context
         DBG_INFO("GB Init returned: %d\n", ret);
 
         if (ret != GB_INIT_NO_ERROR)

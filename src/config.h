@@ -82,8 +82,19 @@
 #define SD_FILE_WRITE_OPEN file_write_open             // (const char *filename) -> void *
 #define SD_FILE_WRITE_FILE_CHUNK file_write_file_chunk // (void *handle, const uint8_t *data, size_t size) -> bool
 
+// keys
+#define KEY_A 0
+#define KEY_B 1
+#define KEY_START 3
+#define KEY_SELECT 2
+#define KEY_RIGHT 7
+#define KEY_DOWN 5
+#define KEY_LEFT 6
+#define KEY_UP 4
+
 // buttons
 #define BUTTON_INCLUDE "picocalc.h"
+#define BUTTON_WAIT wait_key // () -> int (returns KEY_* value)
 #define BUTTON_UP input_pins[KEY_UP] == 0 ? 1 : 0
 #define BUTTON_DOWN input_pins[KEY_DOWN] == 0 ? 1 : 0
 #define BUTTON_LEFT input_pins[KEY_LEFT] == 0 ? 1 : 0
