@@ -135,8 +135,7 @@ void lcd_draw_line(struct gb_s *gb, const uint8_t pixels[LCD_WIDTH],
  */
 int main(void)
 {
-    static struct gb_s gb;    // Game Boy emulator context
-    enum gb_init_error_e ret; // Initialization error code
+    static struct gb_s gb; // Game Boy emulator context
 
 #ifdef BUFFER_ROM_INIT
     BUFFER_ROM_INIT(); // Initialize ROM buffer
@@ -181,15 +180,15 @@ int main(void)
 #endif
 
         /* Initialize Game Boy emulator */
-        BUFFER_ROM_BANK0_FILL();          // Copy ROM bank 0 to RAM for faster access
-        ret = gb_init(&gb,                // Initialize Game Boy context
-                      &gb_rom_read_8bit,  // 8-bit ROM read callback
-                      &gb_rom_read_16bit, // 16-bit ROM read callback
-                      &gb_rom_read_32bit, // 32-bit ROM read callback
-                      &gb_cart_ram_read,  // RAM read callback
-                      &gb_cart_ram_write, // RAM write callback
-                      &gb_error,          // Error handling callback
-                      NULL);              // No custom context
+        BUFFER_ROM_BANK0_FILL();                               // Copy ROM bank 0 to RAM for faster access
+        enum gb_init_error_e ret = gb_init(&gb,                // Initialize Game Boy context
+                                           &gb_rom_read_8bit,  // 8-bit ROM read callback
+                                           &gb_rom_read_16bit, // 16-bit ROM read callback
+                                           &gb_rom_read_32bit, // 32-bit ROM read callback
+                                           &gb_cart_ram_read,  // RAM read callback
+                                           &gb_cart_ram_write, // RAM write callback
+                                           &gb_error,          // Error handling callback
+                                           NULL);              // No custom context
         DBG_INFO("GB Init returned: %d\n", ret);
 
         if (ret != GB_INIT_NO_ERROR)
